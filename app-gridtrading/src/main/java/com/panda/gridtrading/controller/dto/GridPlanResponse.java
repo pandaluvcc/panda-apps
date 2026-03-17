@@ -1,0 +1,244 @@
+package com.panda.gridtrading.controller.dto;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.panda.gridtrading.domain.GridLineState;
+import com.panda.gridtrading.domain.GridType;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+/**
+ * 网格计划响应 DTO
+ */
+public class GridPlanResponse {
+
+    private StrategyInfo strategy;
+    private List<GridPlanItem> gridPlans;
+
+    public static class StrategyInfo {
+        private String name;
+        private String symbol;
+        private BigDecimal basePrice;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getSymbol() {
+            return symbol;
+        }
+
+        public void setSymbol(String symbol) {
+            this.symbol = symbol;
+        }
+
+        public BigDecimal getBasePrice() {
+            return basePrice;
+        }
+
+        public void setBasePrice(BigDecimal basePrice) {
+            this.basePrice = basePrice;
+        }
+    }
+
+    public static class GridPlanItem {
+        private Long id;
+        private GridType gridType;
+        private Integer level;
+        private BigDecimal buyPrice;          // 计划买入价
+        private BigDecimal sellPrice;         // 计划卖出价
+        private BigDecimal actualBuyPrice;    // 实际买入价
+        private BigDecimal actualSellPrice;   // 实际卖出价
+        private BigDecimal buyTriggerPrice;
+        private BigDecimal sellTriggerPrice;
+        private BigDecimal quantity;
+        private BigDecimal buyAmount;
+        private BigDecimal sellAmount;
+
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "0.00")
+        private BigDecimal profit;
+
+        private BigDecimal profitRate;
+        private GridLineState state;
+        private Integer buyCount;
+        private Integer sellCount;
+
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "0.00")
+        private BigDecimal actualProfit;     // 实际收益（已实现）
+
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "0.00")
+        private BigDecimal expectedProfit;   // 预计收益（浮动）
+
+        public Long getId() {
+            return id;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        public GridType getGridType() {
+            return gridType;
+        }
+
+        public void setGridType(GridType gridType) {
+            this.gridType = gridType;
+        }
+
+        public Integer getLevel() {
+            return level;
+        }
+
+        public void setLevel(Integer level) {
+            this.level = level;
+        }
+
+        public BigDecimal getBuyPrice() {
+            return buyPrice;
+        }
+
+        public void setBuyPrice(BigDecimal buyPrice) {
+            this.buyPrice = buyPrice;
+        }
+
+        public BigDecimal getSellPrice() {
+            return sellPrice;
+        }
+
+        public void setSellPrice(BigDecimal sellPrice) {
+            this.sellPrice = sellPrice;
+        }
+
+        public BigDecimal getActualBuyPrice() {
+            return actualBuyPrice;
+        }
+
+        public void setActualBuyPrice(BigDecimal actualBuyPrice) {
+            this.actualBuyPrice = actualBuyPrice;
+        }
+
+        public BigDecimal getActualSellPrice() {
+            return actualSellPrice;
+        }
+
+        public void setActualSellPrice(BigDecimal actualSellPrice) {
+            this.actualSellPrice = actualSellPrice;
+        }
+
+        public BigDecimal getBuyTriggerPrice() {
+            return buyTriggerPrice;
+        }
+
+        public void setBuyTriggerPrice(BigDecimal buyTriggerPrice) {
+            this.buyTriggerPrice = buyTriggerPrice;
+        }
+
+        public BigDecimal getSellTriggerPrice() {
+            return sellTriggerPrice;
+        }
+
+        public void setSellTriggerPrice(BigDecimal sellTriggerPrice) {
+            this.sellTriggerPrice = sellTriggerPrice;
+        }
+
+        public BigDecimal getQuantity() {
+            return quantity;
+        }
+
+        public void setQuantity(BigDecimal quantity) {
+            this.quantity = quantity;
+        }
+
+        public BigDecimal getBuyAmount() {
+            return buyAmount;
+        }
+
+        public void setBuyAmount(BigDecimal buyAmount) {
+            this.buyAmount = buyAmount;
+        }
+
+        public BigDecimal getSellAmount() {
+            return sellAmount;
+        }
+
+        public void setSellAmount(BigDecimal sellAmount) {
+            this.sellAmount = sellAmount;
+        }
+
+        public BigDecimal getProfit() {
+            return profit;
+        }
+
+        public void setProfit(BigDecimal profit) {
+            this.profit = profit;
+        }
+
+        public BigDecimal getProfitRate() {
+            return profitRate;
+        }
+
+        public void setProfitRate(BigDecimal profitRate) {
+            this.profitRate = profitRate;
+        }
+
+        public GridLineState getState() {
+            return state;
+        }
+
+        public void setState(GridLineState state) {
+            this.state = state;
+        }
+
+        public Integer getBuyCount() {
+            return buyCount;
+        }
+
+        public void setBuyCount(Integer buyCount) {
+            this.buyCount = buyCount;
+        }
+
+        public Integer getSellCount() {
+            return sellCount;
+        }
+
+        public void setSellCount(Integer sellCount) {
+            this.sellCount = sellCount;
+        }
+
+        public BigDecimal getActualProfit() {
+            return actualProfit;
+        }
+
+        public void setActualProfit(BigDecimal actualProfit) {
+            this.actualProfit = actualProfit;
+        }
+
+        public BigDecimal getExpectedProfit() {
+            return expectedProfit;
+        }
+
+        public void setExpectedProfit(BigDecimal expectedProfit) {
+            this.expectedProfit = expectedProfit;
+        }
+    }
+
+    public StrategyInfo getStrategy() {
+        return strategy;
+    }
+
+    public void setStrategy(StrategyInfo strategy) {
+        this.strategy = strategy;
+    }
+
+    public List<GridPlanItem> getGridPlans() {
+        return gridPlans;
+    }
+
+    public void setGridPlans(List<GridPlanItem> gridPlans) {
+        this.gridPlans = gridPlans;
+    }
+}

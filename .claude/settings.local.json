@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx vitest:*)",
+      "Bash(git init:*)",
+      "Bash(mvn test:*)",
+      "Bash(mvn:*)",
+      "Bash(npm run:*)",
+      "Skill(update-config)",
+      "Bash(git remote:*)",
+      "Bash(git add:*)",
+      "Bash(git rm:*)"
+    ]
+  }
+}

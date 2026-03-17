@@ -1,0 +1,87 @@
+services:
+  panda-apps:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: panda-apps
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - panda-network
+    deploy:
+      resources:
+        limits:
+          memory: 700M
+        reservations:
+          memory: 400M
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  mysql:
+    image: mysql:8.0
+    container_name: panda-mysql
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./deploy/mysql/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - panda-network
+    deploy:
+      resources:
+        limits:
+          memory: 400M
+        reservations:
+          memory: 200M
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  openresty:
+    image: openresty/openresty:alpine
+    container_name: panda-openresty
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/openresty/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+      - ./deploy/openresty/conf.d:/usr/local/openresty/nginx/conf/conf.d:ro
+      - openresty-logs:/usr/local/openresty/nginx/logs
+    depends_on:
+      - panda-apps
+    networks:
+      - panda-network
+    deploy:
+      resources:
+        limits:
+          memory: 100M
+        reservations:
+          memory: 50M
+
+networks:
+  panda-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+    name: panda-mysql-data
+  openresty-logs:
+    name: panda-openresty-logs

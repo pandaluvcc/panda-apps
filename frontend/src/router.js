@@ -1,0 +1,79 @@
+import { createRouter, createWebHistory } from 'vue-router'
+
+// 网格交易页面
+import GridHome from '@/views/gridtrading/Home.vue'
+import GridRecord from '@/views/gridtrading/Record.vue'
+import GridHistory from '@/views/gridtrading/History.vue'
+import GridStrategyCreate from '@/views/gridtrading/StrategyCreate.vue'
+import GridStrategyDetail from '@/views/gridtrading/StrategyDetail.vue'
+import GridMessageCenter from '@/views/gridtrading/MessageCenter.vue'
+
+// 快记账页面（待开发）
+// import SnapHome from '@/views/snapledger/Home.vue'
+
+const routes = [
+  // 根路由 - 跳转到网格交易首页
+  {
+    path: '/',
+    redirect: '/grid'
+  },
+
+  // ========== 网格交易路由 ==========
+  {
+    path: '/grid',
+    name: 'GridHome',
+    component: GridHome,
+    meta: { module: 'gridtrading', transition: 'page-fade' }
+  },
+  {
+    path: '/grid/create',
+    name: 'GridStrategyCreate',
+    component: GridStrategyCreate,
+    meta: { module: 'gridtrading', transition: 'page-scale' }
+  },
+  {
+    path: '/grid/strategy/:id',
+    name: 'GridStrategyDetail',
+    component: GridStrategyDetail,
+    meta: { module: 'gridtrading', transition: 'page-slide' }
+  },
+  {
+    path: '/grid/record',
+    name: 'GridRecord',
+    component: GridRecord,
+    meta: { module: 'gridtrading', transition: 'page-fade' }
+  },
+  {
+    path: '/grid/history',
+    name: 'GridHistory',
+    component: GridHistory,
+    meta: { module: 'gridtrading', transition: 'page-fade' }
+  },
+  {
+    path: '/grid/messages',
+    name: 'GridMessageCenter',
+    component: GridMessageCenter,
+    meta: { module: 'gridtrading', transition: 'page-slide' }
+  },
+
+  // ========== 快记账路由（待开发） ==========
+  // {
+  //   path: '/snap',
+  //   name: 'SnapHome',
+  //   component: SnapHome,
+  //   meta: { module: 'snapledger' }
+  // },
+
+  // 404 重定向
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/grid'
+  }
+]
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes
+})
+
+export default router

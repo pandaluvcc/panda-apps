@@ -1,0 +1,31 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.iml
+
+# Node
+frontend/node_modules
+frontend/dist
+
+# Maven
+**/target
+**/*.log
+
+# Environment
+.env
+*.env.local
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+**/src/test
+
+# Misc
+.DS_Store
+Thumbs.db
