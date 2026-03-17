@@ -32,6 +32,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { formatPrice } from '@/utils/format'
 
 const props = defineProps({
@@ -66,6 +67,17 @@ const handlePriceChange = () => {
 }
 
 const handleExecute = () => {
+  // 校验：空值或空白字符
+  if (!localPriceInput.value || localPriceInput.value.trim() === '') {
+    ElMessage.warning('请输入价格')
+    return
+  }
+  const price = parseFloat(localPriceInput.value)
+  // 校验：无效价格或非正数
+  if (isNaN(price) || price <= 0) {
+    ElMessage.warning('请输入有效的价格（必须大于 0）')
+    return
+  }
   emit('execute', localPriceInput.value)
 }
 </script>
