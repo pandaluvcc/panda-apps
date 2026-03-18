@@ -1,5 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+// 应用首页
+import AppHome from '@/views/AppHome.vue'
+
 // 网格交易页面
 import GridHome from '@/views/gridtrading/Home.vue'
 import GridRecord from '@/views/gridtrading/Record.vue'
@@ -8,14 +11,19 @@ import GridStrategyCreate from '@/views/gridtrading/StrategyCreate.vue'
 import GridStrategyDetail from '@/views/gridtrading/StrategyDetail.vue'
 import GridMessageCenter from '@/views/gridtrading/MessageCenter.vue'
 
+// 工具页面
+import ApkFolderGenerator from '@/views/tools/ApkFolderGenerator.vue'
+
 // 快记账页面（待开发）
 // import SnapHome from '@/views/snapledger/Home.vue'
 
 const routes = [
-  // 根路由 - 跳转到网格交易首页
+  // 根路由 - 应用首页
   {
     path: '/',
-    redirect: '/grid'
+    name: 'AppHome',
+    component: AppHome,
+    meta: { transition: 'page-fade' }
   },
 
   // ========== 网格交易路由 ==========
@@ -64,15 +72,23 @@ const routes = [
   //   meta: { module: 'snapledger' }
   // },
 
+  // ========== 工具路由 ==========
+  {
+    path: '/tools/apk-folder',
+    name: 'ApkFolderGenerator',
+    component: ApkFolderGenerator,
+    meta: { transition: 'page-fade' }
+  },
+
   // 404 重定向
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/grid'
+    redirect: '/'
   }
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory('/panda-apps/'),
   routes
 })
 

@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class ApkFolderGeneratorService {
 
-    private static final int MIN_SEARCH_VOLUME = 200;
+    private static final int MIN_SEARCH_VOLUME = 300;
 
     public ApkFolderResultDTO generate(MultipartFile file, String targetPath) throws IOException {
         List<KeywordData> allKeywords = readExcel(file);
@@ -151,7 +151,24 @@ public class ApkFolderGeneratorService {
             return null;
         }
         try {
-            String cleanValue = value.replaceAll("[^0-9]", "");
+            String trimmed = value.trim();
+
+            // 处理范围格式，如 "100-300"，取下限值
+            if (trimmed.contains("-")) {
+                String[] parts = trimmed.split("-");
+                if (parts.length >= 1) {
+                    String lowerBound = parts[0].replaceAll("[^0-9]", "");
+                    if (!lowerBound.isEmpty()) {
+                        return Integer.parseInt(lowerBound);
+                    }
+                }
+            }
+
+            // 其他格式：去掉非数字字符
+            String cleanValue = trimmed.replaceAll("[^0-9]", "");
+            if (cleanValue.isEmpty()) {
+                return null;
+            }
             return Integer.parseInt(cleanValue);
         } catch (NumberFormatException e) {
             return null;

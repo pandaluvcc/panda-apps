@@ -63,7 +63,12 @@ const activeTab = computed(() => {
 })
 
 const goBack = () => {
-  router.push('/grid')
+  // 如果有历史记录则返回上一页，否则跳转到应用首页
+  if (window.history.length > 1) {
+    router.back()
+  } else {
+    router.push('/')
+  }
 }
 
 const switchTab = (tab) => {
