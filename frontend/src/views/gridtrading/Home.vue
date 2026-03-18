@@ -99,7 +99,7 @@ const goToDetail = (strategy) => {
 // 处理策略删除
 const handleStrategyDeleted = (strategyId) => {
   // 从 store 中移除
-  strategyStore.strategies = strategyStore.strategies.filter(s => s.id !== strategyId)
+  strategyStore.strategies = strategyStore.strategies.filter((s) => s.id !== strategyId)
 }
 </script>
 
@@ -142,7 +142,9 @@ const handleStrategyDeleted = (strategyId) => {
   color: white;
   border-radius: 10px;
   cursor: pointer;
-  transition: transform 0.15s ease, opacity 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease;
 }
 
 .add-btn:active {

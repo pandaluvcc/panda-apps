@@ -7,10 +7,12 @@
       "Bash(mvn test:*)",
       "Bash(mvn:*)",
       "Bash(npm run:*)",
-      "Skill(update-config)",
-      "Bash(git remote:*)",
-      "Bash(git add:*)",
-      "Bash(git rm:*)"
+      "Bash(find D:/01-develop/02-project/panda/panda-apps/app-gridtrading -type f -name *.vue -o -name *.js -o -name *.tsx -o -name *.ts)",
+      "Bash(./mvnw test:*)",
+      "Read(//c/Users/Administrator/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/2.0.1/.claude/skills/ui-ux-pro-max/**)",
+      "Bash(python scripts/search.py \"fintech trading dashboard statistics header\" --design-system -f markdown -p \"Grid Trading App)",
+      "Bash(python scripts/search.py \"fintech trading dashboard statistics header\" --design-system -f markdown -p \"Grid Trading App\")",
+      "Bash(dir:*)"
     ]
   }
 }

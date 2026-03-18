@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import ElementPlus from 'element-plus'
+import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 import 'element-plus/dist/index.css'
 import Vant from 'vant'
 import 'vant/lib/index.css'
@@ -20,7 +21,9 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 }
 
 app.use(pinia)
-app.use(ElementPlus)
+app.use(ElementPlus, {
+  locale: zhCn
+})
 app.use(Vant)
 app.use(router)
 app.use(CommonComponents)

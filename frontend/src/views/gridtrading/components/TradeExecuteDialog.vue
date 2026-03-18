@@ -34,6 +34,7 @@
             type="datetime"
             placeholder="可选，默认当前时间"
             value-format="YYYY-MM-DD HH:mm:ss"
+            :teleported="false"
             style="width: 100%"
           />
         </el-form-item>
@@ -70,6 +71,7 @@
             type="datetime"
             placeholder="选择交易时间"
             value-format="YYYY-MM-DD HH:mm:ss"
+            :teleported="false"
             style="width: 100%"
           />
         </el-form-item>
@@ -83,7 +85,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { formatPrice, formatQuantity, formatAmount, formatTime } from '@/utils/format'
 
@@ -112,21 +114,40 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'confirm'])
 
-const visible = computed({
-  get: () => props.modelValue,
-  set: (val) => {
-    // 打开弹窗时，如果有默认数量，设置进去
-    if (val && props.price !== null && props.defaultQuantity) {
-      quantityInput.value = String(props.defaultQuantity)
-    }
-    emit('update:modelValue', val)
-  }
-})
-
 const quantityInput = ref('')
 const selectedDirection = ref(null)
 const feeInput = ref('')
 const tradeTime = ref('')
+
+// 打开弹窗时，如果有默认数量，设置进去 - 处理初始打开和重新打开
+// 需要在每次 visible 变化时设置，因为关闭弹窗会清空 quantityInput
+// 添加 immediate: true 确保初始打开就能生效
+watch(
+  () => props.modelValue,
+  (val) => {
+    if (val) {
+      // 设置默认交易数量
+      if (props.price !== null && props.defaultQuantity && props.defaultQuantity > 0) {
+        quantityInput.value = String(props.defaultQuantity)
+      }
+      // 默认设置当前时间
+      if (!tradeTime.value) {
+        const now = new Date()
+        // 格式化为 YYYY-MM-DD HH:mm:ss
+        const pad = (n) => n.toString().padStart(2, '0')
+        tradeTime.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+      }
+    }
+  },
+  { immediate: true }
+)
+
+const visible = computed({
+  get: () => props.modelValue,
+  set: (val) => {
+    emit('update:modelValue', val)
+  }
+})
 
 const alertTitle = computed(() => {
   return props.suggestion?.type === 'BUY' ? '确认买入' : '确认卖出'

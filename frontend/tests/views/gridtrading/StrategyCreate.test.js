@@ -54,7 +54,7 @@ describe('StrategyCreate navigation', () => {
     await wrapper.vm.handleSubmit()
 
     // Wait for setTimeout
-    await new Promise(resolve => setTimeout(resolve, 350))
+    await new Promise((resolve) => setTimeout(resolve, 350))
 
     // Verify that router.replace was called with correct path
     expect(pushSpy).toHaveBeenCalledWith(`/grid/strategy/${mockStrategyId}`)
@@ -96,7 +96,7 @@ describe('StrategyCreate navigation', () => {
     await wrapper.vm.submitImport()
 
     // Wait for setTimeout
-    await new Promise(resolve => setTimeout(resolve, 350))
+    await new Promise((resolve) => setTimeout(resolve, 350))
 
     // Verify that router.replace was called with correct path
     expect(pushSpy).toHaveBeenCalledWith(`/grid/strategy/${mockStrategyId}`)

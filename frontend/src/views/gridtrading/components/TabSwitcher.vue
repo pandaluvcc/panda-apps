@@ -1,17 +1,9 @@
 <template>
   <div class="tab-switcher">
-    <div
-      class="tab-item"
-      :class="{ active: activeTab === 'grids' }"
-      @click="$emit('update:activeTab', 'grids')"
-    >
+    <div class="tab-item" :class="{ active: activeTab === 'grids' }" @click="$emit('update:activeTab', 'grids')">
       网格计划
     </div>
-    <div
-      class="tab-item"
-      :class="{ active: activeTab === 'records' }"
-      @click="$emit('update:activeTab', 'records')"
-    >
+    <div class="tab-item" :class="{ active: activeTab === 'records' }" @click="$emit('update:activeTab', 'records')">
       成交记录
     </div>
   </div>

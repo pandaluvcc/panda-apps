@@ -113,9 +113,7 @@
         <el-icon :size="64" color="#f56c6c"><CircleCloseFilled /></el-icon>
       </div>
       <div class="error-text">加载失败，请重试</div>
-      <el-button type="primary" @click="loadStrategyDetail" class="retry-btn">
-        重新加载
-      </el-button>
+      <el-button type="primary" @click="loadStrategyDetail" class="retry-btn"> 重新加载 </el-button>
     </div>
 
     <!-- 手续费编辑弹窗 -->

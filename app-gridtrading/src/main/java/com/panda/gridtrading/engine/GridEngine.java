@@ -96,6 +96,9 @@ public class GridEngine {
         gridLine.setBuyCount(gridLine.getBuyCount() + 1);
         gridLine.setActualBuyPrice(price);
         gridLine.setBuyPrice(price);
+        // bug修复：用户手动录入交易，更新买入数量和金额为用户实际录入的值
+        gridLine.setBuyQuantity(quantity);
+        gridLine.setBuyAmount(amount);
 
         // 更新买入触发价
         gridLine.setBuyTriggerPrice(GridConstants.calculateBuyTriggerPrice(price));

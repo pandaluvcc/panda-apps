@@ -12,13 +12,7 @@
           @change="handlePriceChange"
         />
       </div>
-      <el-button
-        type="primary"
-        size="large"
-        class="execute-btn"
-        :loading="executing"
-        @click="handleExecute"
-      >
+      <el-button type="primary" size="large" class="execute-btn" :loading="executing" @click="handleExecute">
         执行
       </el-button>
     </div>
@@ -67,12 +61,13 @@ const handlePriceChange = () => {
 }
 
 const handleExecute = () => {
-  // 校验：空值或空白字符
-  if (!localPriceInput.value || localPriceInput.value.trim() === '') {
+  // 校验：空值或空白字符 - 先转为字符串再trim，避免数字类型没有trim方法报错
+  const priceStr = String(localPriceInput.value || '').trim()
+  if (priceStr === '') {
     ElMessage.warning('请输入价格')
     return
   }
-  const price = parseFloat(localPriceInput.value)
+  const price = parseFloat(priceStr)
   // 校验：无效价格或非正数
   if (isNaN(price) || price <= 0) {
     ElMessage.warning('请输入有效的价格（必须大于 0）')

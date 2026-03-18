@@ -23,7 +23,8 @@
         {{ suggestion.reason }}
       </div>
       <div class="suggestion-amount" v-if="suggestion.type === 'SELL' && suggestion.expectedProfit">
-        预期收益: <span :class="getProfitClass(suggestion.expectedProfit)">+¥{{ formatPrice(suggestion.expectedProfit) }}</span>
+        预期收益:
+        <span :class="getProfitClass(suggestion.expectedProfit)">+¥{{ formatPrice(suggestion.expectedProfit) }}</span>
       </div>
     </div>
 

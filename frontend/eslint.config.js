@@ -4,14 +4,7 @@ import eslintConfigPrettier from 'eslint-config-prettier'
 
 export default [
   {
-    ignores: [
-      'node_modules/**',
-      'dist/**',
-      'build/**',
-      '*.config.js',
-      '*.config.cjs',
-      'prettier.config.cjs'
-    ]
+    ignores: ['node_modules/**', 'dist/**', 'build/**', '*.config.js', '*.config.cjs', 'prettier.config.cjs']
   },
   pluginJs.configs.recommended,
   ...pluginVue.configs['vue3-recommended'],

@@ -49,6 +49,26 @@ describe('PriceTriggerCard', () => {
       expect(wrapper.emitted('execute')).toBeUndefined()
     })
 
+    it('should show warning and NOT emit execute when price is undefined', async () => {
+      wrapper = mountComponent({ priceInput: undefined })
+
+      const executeBtn = wrapper.find('.execute-btn')
+      await executeBtn.trigger('click')
+
+      expect(ElMessage.warning).toHaveBeenCalledWith('请输入价格')
+      expect(wrapper.emitted('execute')).toBeUndefined()
+    })
+
+    it('should show warning and NOT emit execute when price is null', async () => {
+      wrapper = mountComponent({ priceInput: null })
+
+      const executeBtn = wrapper.find('.execute-btn')
+      await executeBtn.trigger('click')
+
+      expect(ElMessage.warning).toHaveBeenCalledWith('请输入价格')
+      expect(wrapper.emitted('execute')).toBeUndefined()
+    })
+
     it('should show warning and NOT emit execute when price is whitespace only', async () => {
       wrapper = mountComponent({ priceInput: '   ' })
 
@@ -59,13 +79,23 @@ describe('PriceTriggerCard', () => {
       expect(wrapper.emitted('execute')).toBeUndefined()
     })
 
-    it('should show warning and NOT emit execute when price is zero', async () => {
+    it('should show warning and NOT emit execute when price is zero as string', async () => {
       wrapper = mountComponent({ priceInput: '0' })
 
       const executeBtn = wrapper.find('.execute-btn')
       await executeBtn.trigger('click')
 
       expect(ElMessage.warning).toHaveBeenCalledWith('请输入有效的价格（必须大于 0）')
+      expect(wrapper.emitted('execute')).toBeUndefined()
+    })
+
+    it('should show warning and NOT emit execute when price is zero as number', async () => {
+      wrapper = mountComponent({ priceInput: 0 })
+
+      const executeBtn = wrapper.find('.execute-btn')
+      await executeBtn.trigger('click')
+
+      expect(ElMessage.warning).toHaveBeenCalledWith('请输入价格')
       expect(wrapper.emitted('execute')).toBeUndefined()
     })
 
@@ -90,6 +120,19 @@ describe('PriceTriggerCard', () => {
       // 应该触发 execute 事件
       expect(wrapper.emitted('execute')).toBeTruthy()
       expect(wrapper.emitted('execute')[0]).toEqual(['100.5'])
+    })
+
+    it('should emit execute with valid price when price is valid number', async () => {
+      wrapper = mountComponent({ priceInput: 100.5 })
+
+      const executeBtn = wrapper.find('.execute-btn')
+      await executeBtn.trigger('click')
+
+      // 不应该显示警告
+      expect(ElMessage.warning).not.toHaveBeenCalled()
+      // 应该触发 execute 事件
+      expect(wrapper.emitted('execute')).toBeTruthy()
+      expect(wrapper.emitted('execute')[0]).toEqual([100.5])
     })
   })
 })

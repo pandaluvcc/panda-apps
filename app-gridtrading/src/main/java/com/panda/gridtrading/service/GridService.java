@@ -253,14 +253,17 @@ public class GridService {
             }
 
             if (gl.getGridType() == GridType.SMALL) {
-                lastSmallEffectiveBuyPrice = getEffectiveBuyPrice(gl);
+                BigDecimal price = getEffectiveBuyPrice(gl);
+                lastSmallBuyPrice = price;
+                lastSmallEffectiveBuyPrice = price;
             }
 
             if (gl.getGridType() == GridType.MEDIUM) {
                 mediumCount++;
-                lastMediumBuyPrice = getEffectiveBuyPrice(gl);
+                BigDecimal price = getEffectiveBuyPrice(gl);
+                lastMediumBuyPrice = price;
                 if (mediumCount == 2) {
-                    secondMediumBuyPrice = lastMediumBuyPrice;
+                    secondMediumBuyPrice = price;
                 }
             }
         }
@@ -278,22 +281,21 @@ public class GridService {
             GridLineState currentState = gridLine.getState();
             boolean hasActualBuyPrice = gridLine.getActualBuyPrice() != null;
 
-            // 更新追踪变量
-            if (gridLine.getGridType() == GridType.SMALL) {
-                BigDecimal currentSmallPrice = hasActualBuyPrice ? gridLine.getActualBuyPrice() : gridLine.getBuyPrice();
-                lastSmallBuyPrice = currentSmallPrice;
-                lastSmallEffectiveBuyPrice = currentSmallPrice;
-            } else if (gridLine.getGridType() == GridType.MEDIUM) {
-                mediumCount++;
-                BigDecimal currentMediumPrice = hasActualBuyPrice ? gridLine.getActualBuyPrice() : gridLine.getBuyPrice();
-                lastMediumBuyPrice = currentMediumPrice;
-                if (mediumCount == 2) {
-                    secondMediumBuyPrice = currentMediumPrice;
-                }
-            }
-
-            // 已交易的网格跳过价格更新
+            // 已交易的网格：先用实际价格更新追踪变量，然后跳过价格更新
             if (hasActualBuyPrice) {
+                // 更新追踪变量使用实际成交价格
+                if (gridLine.getGridType() == GridType.SMALL) {
+                    BigDecimal currentSmallPrice = gridLine.getActualBuyPrice();
+                    lastSmallBuyPrice = currentSmallPrice;
+                    lastSmallEffectiveBuyPrice = currentSmallPrice;
+                } else if (gridLine.getGridType() == GridType.MEDIUM) {
+                    mediumCount++;
+                    BigDecimal currentMediumPrice = gridLine.getActualBuyPrice();
+                    lastMediumBuyPrice = currentMediumPrice;
+                    if (mediumCount == 2) {
+                        secondMediumBuyPrice = currentMediumPrice;
+                    }
+                }
                 log.info("[RECALC-SKIP] 网格 level={} 已交易，跳过价格更新", gridLine.getLevel());
                 continue;
             }
@@ -309,6 +311,7 @@ public class GridService {
                 BigDecimal minSellPrice = newBuyPrice.multiply(BigDecimal.ONE.add(GridConstants.SMALL_PROFIT_RATE));
                 newSellPrice = maxPrice(minSellPrice, lastSmallEffectiveBuyPrice);
 
+                // 计算完新价格后更新追踪变量，供后续网格使用
                 lastSmallBuyPrice = newBuyPrice;
                 lastSmallEffectiveBuyPrice = newBuyPrice;
 
@@ -324,6 +327,7 @@ public class GridService {
                 }
                 newSellPrice = maxPrice(minSellPrice, targetSellPrice);
 
+                // 计算完新价格后更新追踪变量，供后续网格使用
                 mediumCount++;
                 lastMediumBuyPrice = newBuyPrice;
                 if (mediumCount == 2) {
@@ -386,11 +390,24 @@ public class GridService {
 
     /**
      * 重新计算网格的金额和数量
+     * <p>
+     * 修复：未成交网格应该保持策略创建时的固定买入数量，不应该因为买入价变化而改变数量
+     * 只有已成交网格的买入价变化才需要重新计算金额
      */
     private void recalculateGridLineAmounts(GridLine gridLine, BigDecimal newBuyPrice, BigDecimal newSellPrice) {
-        BigDecimal buyAmount = gridLine.getBuyAmount();
-        BigDecimal buyQuantity = buyAmount.divide(newBuyPrice, 8, RoundingMode.DOWN);
+        // 关键修复：未成交网格保持策略创建时的固定买入数量
+        // 只有已成交网格的买入数量是用户实际买入的，需要保留
+        BigDecimal buyQuantity = gridLine.getBuyQuantity();
+        if (gridLine.getState() == GridLineState.WAIT_BUY) {
+            // 未成交：保持策略创建时的固定数量不变
+            // 只需要根据新买入价重新计算金额即可
+            buyQuantity = gridLine.getStrategy().getQuantityPerGrid();
+        }
+        // 如果是已成交，保持用户实际录入的买入数量不变
+
+        BigDecimal buyAmount = buyQuantity.multiply(newBuyPrice).setScale(2, RoundingMode.DOWN);
         gridLine.setBuyQuantity(buyQuantity);
+        gridLine.setBuyAmount(buyAmount);
 
         BigDecimal sellAmount = buyQuantity.multiply(newSellPrice).setScale(2, RoundingMode.DOWN);
         gridLine.setSellAmount(sellAmount);
@@ -408,6 +425,7 @@ public class GridService {
     private void recalculateGridLineSellAmounts(GridLine gridLine, BigDecimal newSellPrice) {
         BigDecimal buyQuantity = gridLine.getBuyQuantity();
         if (buyQuantity != null) {
+            // 买入数量保持用户实际录入的不变，只重新计算卖出金额
             BigDecimal sellAmount = buyQuantity.multiply(newSellPrice).setScale(2, RoundingMode.DOWN);
             gridLine.setSellAmount(sellAmount);
 
@@ -418,5 +436,7 @@ public class GridService {
             BigDecimal profitRate = profit.divide(buyAmount, 6, RoundingMode.HALF_UP);
             gridLine.setProfitRate(profitRate);
         }
+        // 这个方法只更新卖出金额，买入数量保持不变
+        // 所以不需要修改买入数量，逻辑正确
     }
 }

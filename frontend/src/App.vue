@@ -45,7 +45,9 @@ body {
 /* 页面过渡动画 - 滑动 */
 .page-slide-enter-active,
 .page-slide-leave-active {
-  transition: transform var(--page-transition-duration, 0.25s) ease, opacity var(--page-transition-duration, 0.25s) ease;
+  transition:
+    transform var(--page-transition-duration, 0.25s) ease,
+    opacity var(--page-transition-duration, 0.25s) ease;
 }
 
 .page-slide-enter-from {
@@ -61,7 +63,9 @@ body {
 /* 页面过渡动画 - 缩放 */
 .page-scale-enter-active,
 .page-scale-leave-active {
-  transition: transform var(--page-transition-duration, 0.25s) ease, opacity var(--page-transition-duration, 0.25s) ease;
+  transition:
+    transform var(--page-transition-duration, 0.25s) ease,
+    opacity var(--page-transition-duration, 0.25s) ease;
 }
 
 .page-scale-enter-from {
