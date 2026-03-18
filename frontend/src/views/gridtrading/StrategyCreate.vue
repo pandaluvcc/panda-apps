@@ -487,7 +487,9 @@ const handleSubmit = async () => {
   border: none;
   border-radius: 24px;
   cursor: pointer;
-  transition: opacity var(--transition-base), transform var(--transition-fast);
+  transition:
+    opacity var(--transition-base),
+    transform var(--transition-fast);
 }
 
 .import-btn:active {
@@ -527,7 +529,9 @@ const handleSubmit = async () => {
   border: none;
   border-radius: 26px;
   cursor: pointer;
-  transition: opacity var(--transition-base), transform var(--transition-fast);
+  transition:
+    opacity var(--transition-base),
+    transform var(--transition-fast);
 }
 
 .submit-btn:active {
