@@ -27,6 +27,9 @@
       <van-button type="primary" block to="/snap/add">
         <van-icon name="plus" /> 记一笔
       </van-button>
+      <van-button type="default" block to="/snap/scan" class="scan-btn">
+        <van-icon name="photograph" /> 图片记账
+      </van-button>
     </div>
 
     <!-- 最近记录 -->
@@ -133,6 +136,14 @@ function goToEdit(record) {
 
 .quick-actions {
   padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.scan-btn {
+  color: #667eea;
+  border-color: #667eea;
 }
 
 .recent-records {
