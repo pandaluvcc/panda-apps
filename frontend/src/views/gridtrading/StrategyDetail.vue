@@ -1,5 +1,5 @@
 <template>
-  <MobileLayout :title="strategyTitle" :show-back="true" :show-tab-bar="false" :show-header="false">
+  <MobileLayout :title="strategyTitle" :show-back="true" :show-tab-bar="false" :show-header="false" back-to="/grid">
     <div v-if="loading" class="skeleton-container">
       <!-- 头部骨架 -->
       <div class="skeleton-header">

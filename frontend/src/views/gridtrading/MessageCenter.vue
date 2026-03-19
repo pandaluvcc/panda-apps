@@ -291,11 +291,11 @@ const loadData = async () => {
 }
 
 const goBack = () => {
-  router.back()
+  router.push('/grid')
 }
 
 const goToStrategyDetail = (strategyId) => {
-  router.push(`/m/strategy/${strategyId}`)
+  router.push(`/grid/strategy/${strategyId}`)
 }
 
 const quickExecute = (item) => {

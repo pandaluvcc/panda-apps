@@ -41,7 +41,8 @@ public class PositionCalculator {
             return;
         }
 
-        log.debug("[PositionCalculator] 开始计算，策略ID={}，成交记录数={}", strategy.getId(), records.size());
+        log.info("[PositionCalculator] ===== 开始计算持仓盈亏 =====");
+        log.info("[PositionCalculator] 策略ID={}，成交记录数={}", strategy.getId(), records.size());
 
         BigDecimal totalBuyAmount = BigDecimal.ZERO;
         BigDecimal totalBuyQuantity = BigDecimal.ZERO;
@@ -78,8 +79,8 @@ public class PositionCalculator {
                     avgBuyPrice = currentHoldingCost.divide(currentHoldingQuantity, 8, RoundingMode.HALF_UP);
                 }
 
-                log.trace("买入记录: price={}, quantity={}, amount={}, fee={}",
-                        record.getPrice(), quantity, amount, fee);
+                log.info("[PositionCalculator] 买入记录: 时间={}, 价格={}, 数量={}, 金额={}, 手续费={}",
+                        record.getTradeTime(), record.getPrice(), quantity, amount, fee);
 
             } else if (record.getType() == TradeType.SELL) {
                 totalSellAmount = totalSellAmount.add(amount);
@@ -92,13 +93,21 @@ public class PositionCalculator {
                     currentHoldingQuantity = currentHoldingQuantity.subtract(quantity);
                 }
 
-                log.trace("卖出记录: price={}, quantity={}, amount={}, fee={}",
-                        record.getPrice(), quantity, amount, fee);
+                log.info("[PositionCalculator] 卖出记录: 时间={}, 价格={}, 数量={}, 金额={}, 手续费={}",
+                        record.getTradeTime(), record.getPrice(), quantity, amount, fee);
             }
         }
 
+        log.info("[PositionCalculator] ===== 汇总数据 =====");
+        log.info("[PositionCalculator] 买入总金额={}, 买入总数量={}", totalBuyAmount, totalBuyQuantity);
+        log.info("[PositionCalculator] 卖出总金额={}, 卖出总数量={}", totalSellAmount, totalSellQuantity);
+        log.info("[PositionCalculator] 手续费合计={}", totalFee);
+
         BigDecimal currentPosition = totalBuyQuantity.subtract(totalSellQuantity);
         BigDecimal netInvestment = totalBuyAmount.subtract(totalSellAmount).add(totalFee);
+
+        log.info("[PositionCalculator] 持仓数量={} (买入{} - 卖出{})", currentPosition, totalBuyQuantity, totalSellQuantity);
+        log.info("[PositionCalculator] 净投入={} (买入{} - 卖出{} + 手续费{})", netInvestment, totalBuyAmount, totalSellAmount, totalFee);
 
         // 成本价
         BigDecimal costPrice = BigDecimal.ZERO;
@@ -119,6 +128,9 @@ public class PositionCalculator {
 
         BigDecimal lastPrice = strategy.getLastPrice() != null ? strategy.getLastPrice() : strategy.getBasePrice();
 
+        log.info("[PositionCalculator] ===== 持仓盈亏计算 =====");
+        log.info("[PositionCalculator] 现价={} (lastPrice={}, basePrice={})", lastPrice, strategy.getLastPrice(), strategy.getBasePrice());
+
         // 持仓盈亏计算
         BigDecimal positionProfit = BigDecimal.ZERO;
         BigDecimal positionProfitPercent = BigDecimal.ZERO;
@@ -127,6 +139,10 @@ public class PositionCalculator {
         if (lastPrice != null && currentPosition.compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal marketValue = lastPrice.multiply(currentPosition);
             positionProfit = marketValue.subtract(netInvestment).setScale(2, RoundingMode.HALF_UP);
+
+            log.info("[PositionCalculator] 市值 = {} × {} = {}", lastPrice, currentPosition, marketValue);
+            log.info("[PositionCalculator] 持仓盈亏 = {} - {} = {}", marketValue, netInvestment, positionProfit);
+            log.info("[PositionCalculator] ===== 计算完成 =====");
 
             if (costPrice.compareTo(BigDecimal.ZERO) > 0) {
                 positionProfitPercent = lastPrice.subtract(costPrice)
@@ -184,6 +200,9 @@ public class PositionCalculator {
      */
     @Transactional
     public void updateByLastPrice(Strategy strategy, BigDecimal newLastPrice) {
+        log.info("[PositionCalculator] ===== updateByLastPrice 开始 =====");
+        log.info("[PositionCalculator] 新现价={}", newLastPrice);
+
         strategy.setLastPrice(newLastPrice);
 
         BigDecimal currentPosition = strategy.getPosition();
@@ -192,6 +211,10 @@ public class PositionCalculator {
         BigDecimal totalFee = strategy.getTotalFee() != null ? strategy.getTotalFee() : BigDecimal.ZERO;
         BigDecimal netInvestment = totalBuyAmount.subtract(totalSellAmount).add(totalFee);
 
+        log.info("[PositionCalculator] 持仓数量={}", currentPosition);
+        log.info("[PositionCalculator] 买入总金额={}, 卖出总金额={}, 手续费={}", totalBuyAmount, totalSellAmount, totalFee);
+        log.info("[PositionCalculator] 净投入 = {} - {} + {} = {}", totalBuyAmount, totalSellAmount, totalFee, netInvestment);
+
         if (currentPosition == null || currentPosition.compareTo(BigDecimal.ZERO) <= 0) {
             log.debug("[PositionCalculator] updateByLastPrice: 无持仓，跳过计算");
             return;
@@ -199,6 +222,11 @@ public class PositionCalculator {
 
         BigDecimal marketValue = newLastPrice.multiply(currentPosition);
         BigDecimal positionProfit = marketValue.subtract(netInvestment).setScale(2, RoundingMode.HALF_UP);
+
+        log.info("[PositionCalculator] 市值 = {} × {} = {}", newLastPrice, currentPosition, marketValue);
+        log.info("[PositionCalculator] 持仓盈亏 = {} - {} = {}", marketValue, netInvestment, positionProfit);
+        log.info("[PositionCalculator] ===== updateByLastPrice 完成 =====");
+
         strategy.setPositionProfit(positionProfit);
 
         BigDecimal costPrice = strategy.getCostPrice() != null ? strategy.getCostPrice() : BigDecimal.ZERO;

@@ -1,5 +1,5 @@
 <template>
-  <MobileLayout title="我的网格" :show-back="true" :show-tab-bar="false">
+  <MobileLayout title="我的网格" :show-back="true" :show-tab-bar="false" back-to="/">
     <!-- 头部区域 -->
     <HomeHeader
       :message-count="totalSuggestionsCount"

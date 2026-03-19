@@ -183,7 +183,7 @@ const handlePriceChange = () => {
 }
 
 const goBack = () => {
-  router.push('/m')
+  router.push('/grid')
 }
 </script>
 

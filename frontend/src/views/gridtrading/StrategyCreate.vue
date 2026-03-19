@@ -1,5 +1,5 @@
 <template>
-  <MobileLayout title="创建策略" :show-back="true" :show-tab-bar="false">
+  <MobileLayout title="创建策略" :show-back="true" :show-tab-bar="false" back-to="/grid">
     <div class="mobile-create">
       <!-- 表单区域 -->
       <div class="form-area">
@@ -204,7 +204,7 @@ const isFormValid = computed(() => {
 
 // 返回
 const goBack = () => {
-  router.back()
+  router.push('/grid')
 }
 
 const handleFileChange = (file, fileList) => {

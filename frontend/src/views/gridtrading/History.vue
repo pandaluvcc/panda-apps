@@ -181,11 +181,11 @@ const selectStrategy = async (id) => {
 }
 
 // 导航
-const goBack = () => router.back()
-const goHome = () => router.push('/m')
+const goBack = () => router.push('/grid')
+const goHome = () => router.push('/grid')
 const goToRecord = () => {
   if (selectedStrategyId.value) {
-    router.push(`/m/record?strategyId=${selectedStrategyId.value}`)
+    router.push(`/grid/record?strategyId=${selectedStrategyId.value}`)
   }
 }
 

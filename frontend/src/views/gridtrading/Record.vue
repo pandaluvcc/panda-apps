@@ -273,7 +273,7 @@ const handleSubmit = async () => {
 
 // 返回
 const goBack = () => {
-  router.back()
+  router.push('/grid')
 }
 
 // 格式化

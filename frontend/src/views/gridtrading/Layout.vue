@@ -51,6 +51,10 @@ const props = defineProps({
   showHeader: {
     type: Boolean,
     default: true
+  },
+  backTo: {
+    type: String,
+    default: ''
   }
 })
 
@@ -63,7 +67,12 @@ const activeTab = computed(() => {
 })
 
 const goBack = () => {
-  // 如果有历史记录则返回上一页，否则跳转到应用首页
+  // 如果指定了返回路径，直接跳转
+  if (props.backTo) {
+    router.push(props.backTo)
+    return
+  }
+  // 否则如果有历史记录则返回上一页，否则跳转到应用首页
   if (window.history.length > 1) {
     router.back()
   } else {

@@ -49,9 +49,10 @@
     <!-- 应用日志级别 -->
     <logger name="com.panda.gridtrading" level="INFO"/>
 
-    <!-- Hibernate SQL 日志 -->
-    <logger name="org.hibernate.SQL" level="WARN"/>
-    <logger name="org.hibernate.type.descriptor.sql" level="WARN"/>
+    <!-- Hibernate SQL 日志 - 完全关闭 -->
+    <logger name="org.hibernate.SQL" level="OFF"/>
+    <logger name="org.hibernate.type.descriptor.sql" level="OFF"/>
+    <logger name="org.hibernate.orm.jdbc.bind" level="OFF"/>
 
     <!-- Spring 框架日志 -->
     <logger name="org.springframework" level="WARN"/>
