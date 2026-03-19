@@ -42,13 +42,18 @@
     <build>
         <plugins>
             <!-- Keep spring-boot-maven-plugin for mvn spring-boot:run (local development) -->
-            <!-- Don't repackage the jar, our custom thin jar is the main artifact -->
+            <!-- Only skip repackage goal for package phase, we still want the run goal -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <skip>true</skip>
-                </configuration>
+                <executions>
+                    <execution>
+                        <id>repackage</id>
+                        <configuration>
+                            <skip>true</skip>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <!-- Unpack all internal modules (com.panda) -->
             <plugin>
