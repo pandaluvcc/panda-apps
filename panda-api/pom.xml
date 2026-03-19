@@ -40,12 +40,21 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
                     <layout>ZIP</layout>
-                    <excludes>
-                        <exclude>
-                            <groupId>*</groupId>
-                            <artifactId>*</artifactId>
-                        </exclude>
-                    </excludes>
+                    <!-- Include only our own modules, exclude all third-party dependencies -->
+                    <includes>
+                        <include>
+                            <groupId>com.panda</groupId>
+                            <artifactId>common</artifactId>
+                        </include>
+                        <include>
+                            <groupId>com.panda</groupId>
+                            <artifactId>app-gridtrading</artifactId>
+                        </include>
+                        <include>
+                            <groupId>com.panda</groupId>
+                            <artifactId>app-snapledger</artifactId>
+                        </include>
+                    </includes>
                 </configuration>
             </plugin>
         </plugins>
