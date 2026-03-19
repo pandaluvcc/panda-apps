@@ -1,6 +1,6 @@
 package com.panda.snapledger.controller;
 
-import com.panda.snapledger.service.import.MozeCsvImporter;
+import com.panda.snapledger.service.csvimport.MozeCsvImporter;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;

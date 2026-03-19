@@ -21,6 +21,13 @@
             <artifactId>common</artifactId>
         </dependency>
 
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- CSV 解析 -->
         <dependency>
             <groupId>org.apache.commons</groupId>

@@ -1,4 +1,4 @@
-package com.panda.snapledger.service.import;
+package com.panda.snapledger.service.csvimport;
 
 import com.panda.snapledger.domain.Account;
 import com.panda.snapledger.domain.Category;
