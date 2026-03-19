@@ -19,6 +19,7 @@ import SnapHome from '@/views/snapledger/Home.vue'
 import SnapAddRecord from '@/views/snapledger/AddRecord.vue'
 import SnapCalendar from '@/views/snapledger/Calendar.vue'
 import SnapImport from '@/views/snapledger/Import.vue'
+import SnapScan from '@/views/snapledger/Scan.vue'
 
 const routes = [
   // 根路由 - 应用首页
@@ -96,6 +97,12 @@ const routes = [
     path: '/snap/import',
     name: 'SnapImport',
     component: SnapImport,
+    meta: { module: 'snapledger', transition: 'page-fade' }
+  },
+  {
+    path: '/snap/scan',
+    name: 'SnapScan',
+    component: SnapScan,
     meta: { module: 'snapledger', transition: 'page-fade' }
   },
 
