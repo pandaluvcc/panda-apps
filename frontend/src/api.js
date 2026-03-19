@@ -13,6 +13,9 @@ export * from '@/api/gridtrading/trade'
 export * from '@/api/gridtrading/ocr'
 export * from '@/api/gridtrading/suggestion'
 
-// ========== 快记账 API（待开发） ==========
-// export * from '@/api/snapledger/account'
-// export * from '@/api/snapledger/record'
+// ========== 快记账 API ==========
+export * from '@/api/snapledger/record'
+export * from '@/api/snapledger/calendar'
+export * from '@/api/snapledger/category'
+export * from '@/api/snapledger/account'
+export * from '@/api/snapledger/import'
