@@ -15,6 +15,12 @@
     <description>应用启动入口</description>
 
     <dependencies>
+        <!-- Spring Boot 启动依赖（本地开发需要，打包时会被排除） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
         <!-- 业务模块 -->
         <dependency>
             <groupId>com.panda</groupId>
@@ -35,27 +41,34 @@
 
     <build>
         <plugins>
+            <!-- Keep spring-boot-maven-plugin for mvn spring-boot:run (local development) -->
+            <!-- Don't repackage the jar, our custom thin jar is the main artifact -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <layout>ZIP</layout>
-                    <!-- Include only our own modules, exclude all third-party dependencies -->
-                    <includes>
-                        <include>
-                            <groupId>com.panda</groupId>
-                            <artifactId>common</artifactId>
-                        </include>
-                        <include>
-                            <groupId>com.panda</groupId>
-                            <artifactId>app-gridtrading</artifactId>
-                        </include>
-                        <include>
-                            <groupId>com.panda</groupId>
-                            <artifactId>app-snapledger</artifactId>
-                        </include>
-                    </includes>
+                    <skip>true</skip>
                 </configuration>
+            </plugin>
+            <!-- Unpack all internal modules (com.panda) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>unpack-internal-modules</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>unpack-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <includeGroupIds>com.panda</includeGroupIds>
+                            <outputDirectory>${project.build.directory}/classes</outputDirectory>
+                            <exclude>META-INF/**</exclude>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
