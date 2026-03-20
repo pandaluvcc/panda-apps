@@ -1,5 +1,6 @@
 {
   "permissions": {
+    "defaultMode": "dontAsk",
     "allow": [
       "Bash(npm install:*)",
       "Bash(npx vitest:*)",
@@ -12,7 +13,24 @@
       "Read(//c/Users/Administrator/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/2.0.1/.claude/skills/ui-ux-pro-max/**)",
       "Bash(python scripts/search.py \"fintech trading dashboard statistics header\" --design-system -f markdown -p \"Grid Trading App)",
       "Bash(python scripts/search.py \"fintech trading dashboard statistics header\" --design-system -f markdown -p \"Grid Trading App\")",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(git commit:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Read(//c/Users/panda/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/2.0.1/.claude/skills/ui-ux-pro-max/**)",
+      "Bash(python scripts/search.py \"tool productivity app launcher minimal modern\" --design-system -p \"Panda Apps\")",
+      "Read(//c/Users/panda/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/2.0.1/**)",
+      "Bash(python src/ui-ux-pro-max/scripts/search.py \"tool productivity app launcher minimal modern\" --design-system -p \"Panda Apps\")",
+      "Bash(python src/ui-ux-pro-max/scripts/search.py \"glassmorphism modern app\" --design-system -p \"Glass Style\")",
+      "Bash(python src/ui-ux-pro-max/scripts/search.py \"neumorphism soft modern\" --design-system -p \"Neumorphism Style\")",
+      "Bash(python src/ui-ux-pro-max/scripts/search.py \"bento grid modern dashboard\" --design-system -p \"Bento Style\")",
+      "Bash(python src/ui-ux-pro-max/scripts/search.py \"app launcher home dashboard\" --domain ux -n 10)",
+      "Bash(python src/ui-ux-pro-max/scripts/search.py \"card focus visual hierarchy\" --domain ux -n 10)",
+      "Bash(python src/ui-ux-pro-max/scripts/search.py \"dashboard card contrast\" --domain style -n 10)",
+      "Bash(python src/ui-ux-pro-max/scripts/search.py \"minimal clean white\" --domain color -n 5)",
+      "Bash(git add:*)",
+      "Bash(claude tasks:*)",
+      "Skill(update-config)"
     ]
   }
 }

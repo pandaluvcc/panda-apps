@@ -31,4 +31,10 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
 
     @Query("SELECT DISTINCT r.subCategory FROM Record r WHERE r.mainCategory = :mainCategory")
     List<String> findDistinctSubCategoriesByMainCategory(@Param("mainCategory") String mainCategory);
+
+    @Query("SELECT r FROM Record r WHERE YEAR(r.date) = :year AND MONTH(r.date) = :month AND r.recordType = :type ORDER BY r.date DESC, r.time DESC")
+    List<Record> findByYearAndMonthAndType(@Param("year") int year, @Param("month") int month, @Param("type") String type);
+
+    @Query("SELECT SUM(r.amount) FROM Record r WHERE YEAR(r.date) = :year AND MONTH(r.date) = :month AND r.recordType = '支出'")
+    BigDecimal sumExpenseByMonth(@Param("year") int year, @Param("month") int month);
 }
