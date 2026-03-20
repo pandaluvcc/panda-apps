@@ -1,6 +1,5 @@
 package com.panda.snapledger.service;
 
-import com.panda.PandaApplication;
 import com.panda.snapledger.controller.dto.BudgetDTO;
 import com.panda.snapledger.domain.Budget;
 import com.panda.snapledger.repository.BudgetRepository;
@@ -12,7 +11,7 @@ import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(classes = PandaApplication.class)
+@SpringBootTest
 class BudgetServiceTest {
 
     @Autowired

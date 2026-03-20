@@ -18,7 +18,7 @@ import java.time.LocalTime;
 /**
  * OCR image recognition controller for payment screenshots.
  */
-@RestController
+@RestController("snapOcrController")
 @RequestMapping("/api/snapledger/ocr")
 @CrossOrigin(origins = "*")
 public class OcrController {

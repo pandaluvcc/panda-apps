@@ -1,5 +1,6 @@
 package com.panda.gridtrading.service.ocr;
 
+import com.panda.common.ocr.BaiduOcrClient;
 import com.panda.gridtrading.controller.dto.OcrMatchStatus;
 import com.panda.gridtrading.controller.dto.OcrRecognizeResponse;
 import com.panda.gridtrading.controller.dto.OcrTradeRecord;
@@ -185,7 +186,7 @@ public class OcrService {
         }
 
         records = dedupeRecords(records);
-        // records = mergeSplitBuys(records);  // 禁用合并，保留所有交易记录
+        records = mergeSplitBuys(records);
         records = sortRecords(records);
         records = filterUsable(records);
 
@@ -201,15 +202,15 @@ public class OcrService {
             throw new IllegalArgumentException("basePrice or amountPerGrid not found");
         }
 
-    String[] extracted = extractNameAndSymbol(rawTextBuilder.toString());
-    String resolvedName = name != null && !name.trim().isEmpty() ? name : extracted[0];
-    String resolvedSymbol = symbol != null && !symbol.trim().isEmpty() ? symbol : extracted[1];
+        String[] extracted = extractNameAndSymbol(rawTextBuilder.toString());
+        String resolvedName = name != null && !name.trim().isEmpty() ? name : extracted[0];
+        String resolvedSymbol = symbol != null && !symbol.trim().isEmpty() ? symbol : extracted[1];
 
-    // 使用传入的网格计算模式，默认为独立计算模式
-    String calculationMode = gridCalculationMode != null && !gridCalculationMode.trim().isEmpty() 
-            ? gridCalculationMode : "INDEPENDENT";
+        // 使用传入的网格计算模式，默认为独立计算模式
+        String calculationMode = gridCalculationMode != null && !gridCalculationMode.trim().isEmpty()
+                ? gridCalculationMode : "INDEPENDENT";
 
-    Strategy strategy = buildStrategy(resolvedName, resolvedSymbol, basePrice, amountPerGrid, quantityPerGrid, calculationMode);
+        Strategy strategy = buildStrategy(resolvedName, resolvedSymbol, basePrice, amountPerGrid, quantityPerGrid, calculationMode);
         strategy = strategyRepository.save(strategy);
 
         List<GridLine> orderedGridLines = new ArrayList<>(strategy.getGridLines());
@@ -233,7 +234,9 @@ public class OcrService {
                 // 判断是否是相同价格的连续买入
                 boolean isSamePriceAsLast = lastBuyPrice != null && lastBuyPrice.compareTo(record.getPrice()) == 0;
 
-                if (isSamePriceAsLast && lastBuyGrid != null) {
+                // 修复：相同价格只有当上一个网格还是WAIT_BUY状态时才合并
+                // 如果上一个网格已经BOUGHT，说明同价格还有其他未分配网格，应该分配新网格
+                if (isSamePriceAsLast && lastBuyGrid != null && lastBuyGrid.getState() == GridLineState.WAIT_BUY) {
                     // 相同价格，匹配到上一次的网格
                     gridLine = lastBuyGrid;
                     isConsecutiveBuy = true; // 标记为连续买入，不增加buyCount

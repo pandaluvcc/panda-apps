@@ -31,15 +31,17 @@
         </div>
 
         <!-- 快记账 -->
-        <div class="app-card app-card-disabled" @click="showComingSoon">
+        <div class="app-card" @click="goToApp('/snap')">
           <div class="app-icon">
             <el-icon :size="32"><Wallet /></el-icon>
           </div>
           <div class="app-info">
             <h2 class="app-name">快记账</h2>
-            <p class="app-desc">个人记账工具 · 即将上线</p>
+            <p class="app-desc">个人账单随手记</p>
           </div>
-          <div class="app-badge">敬请期待</div>
+          <div class="app-arrow">
+            <el-icon><ArrowRight /></el-icon>
+          </div>
         </div>
       </div>
 

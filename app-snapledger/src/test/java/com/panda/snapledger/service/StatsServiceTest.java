@@ -1,6 +1,5 @@
 package com.panda.snapledger.service;
 
-import com.panda.PandaApplication;
 import com.panda.snapledger.controller.dto.MonthlyStatsDTO;
 import com.panda.snapledger.controller.dto.CategoryStatsDTO;
 import org.junit.jupiter.api.Test;
@@ -12,7 +11,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(classes = PandaApplication.class)
+@SpringBootTest
 class StatsServiceTest {
 
     @Autowired
