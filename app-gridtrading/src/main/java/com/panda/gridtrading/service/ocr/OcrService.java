@@ -130,7 +130,6 @@ public class OcrService {
         }
 
         records = dedupeRecords(records);
-        records = mergeSplitBuys(records);
         matchRecords(records, strategy, null);
 
         return OcrRecognizeResponse.success(rawTextBuilder.toString(), records);
@@ -186,7 +185,6 @@ public class OcrService {
         }
 
         records = dedupeRecords(records);
-        records = mergeSplitBuys(records);
         records = sortRecords(records);
         records = filterUsable(records);
 
@@ -221,8 +219,13 @@ public class OcrService {
         // 跟踪最后一次买入的网格和价格（用于相同价格连续买入匹配到同一网格）
         GridLine lastBuyGrid = null;
         BigDecimal lastBuyPrice = null;
+        // 累计数量：最后一个网格已经累计了多少数量（用于拆分补单合并）
+        // 当累计数量 < 默认每网数量时，相同价格继续合并
+        BigDecimal accumulatedQuantity = BigDecimal.ZERO;
+        BigDecimal defaultQuantityPerGrid = strategy.getQuantityPerGrid();
 
         System.out.println("[OCR导入] 开始按时间顺序匹配记录，共 " + records.size() + " 条记录");
+        System.out.println("[OCR导入] 默认每网数量: " + defaultQuantityPerGrid);
         for (OcrTradeRecord record : records) {
             if (record == null || record.getType() == null || record.getPrice() == null) {
                 continue;
@@ -231,21 +234,34 @@ public class OcrService {
             GridLine gridLine = null;
             boolean isConsecutiveBuy = false; // 标记是否是相同价格连续买入（不增加买入次数）
             if (record.getType().isBuy()) {
-                // 判断是否是相同价格的连续买入
-                boolean isSamePriceAsLast = lastBuyPrice != null && lastBuyPrice.compareTo(record.getPrice()) == 0;
+                // 判断是否需要合并到上一个网格：
+                // 1. 存在最后一个网格
+                // 2. 价格相同
+                // 3. 累计数量 + 当前记录数量 <= 默认每网数量 → 还没填满一网，继续合并
+                // （不需要检查WAIT_BUY状态，因为刚分配买入后状态就是BOUGHT，仍然可以继续合并数量）
+                boolean needMerge = false;
+                if (lastBuyGrid != null
+                    && lastBuyPrice != null
+                    && lastBuyPrice.compareTo(record.getPrice()) == 0
+                    && accumulatedQuantity.add(record.getQuantity()).compareTo(defaultQuantityPerGrid) <= 0) {
+                    needMerge = true;
+                }
 
-                // 修复：相同价格只有当上一个网格还是WAIT_BUY状态时才合并
-                // 如果上一个网格已经BOUGHT，说明同价格还有其他未分配网格，应该分配新网格
-                if (isSamePriceAsLast && lastBuyGrid != null && lastBuyGrid.getState() == GridLineState.WAIT_BUY) {
-                    // 相同价格，匹配到上一次的网格
+                if (needMerge) {
+                    // 相同价格，累计数量还没填满一网，合并到上一次的网格
                     gridLine = lastBuyGrid;
                     isConsecutiveBuy = true; // 标记为连续买入，不增加buyCount
+                    accumulatedQuantity = accumulatedQuantity.add(record.getQuantity());
                     String typeDesc = record.getType() == TradeType.OPENING_BUY ? "建仓-买入" : "买入";
                     System.out.println("[OCR导入] " + typeDesc + "记录: 时间=" + record.getTradeTime() +
-                        " 价格=" + record.getPrice() + " → 匹配网格 " + gridLine.getLevel() + " (相同价格连续买入，合并计数)");
+                        " 价格=" + record.getPrice() + " → 合并到网格 " + gridLine.getLevel() +
+                        " (累计数量: " + accumulatedQuantity + "/" + defaultQuantityPerGrid + ")");
                     // 同样加入openBuys，确保每条买入都有对应的卖出匹配
                     openBuys.push(gridLine);
                 } else {
+                    // 不能合并，分配新网格（或重新买入已卖出网格）
+                    // 开始新网格前重置累计
+                    accumulatedQuantity = BigDecimal.ZERO;
                     // 优先查找已经完成至少一轮买卖（已全部卖出）且买入价匹配的网格
                     GridLine matchedSoldGrid = orderedGridLines.stream()
                             .filter(gl -> gl.getState() == GridLineState.WAIT_BUY
@@ -265,21 +281,97 @@ public class OcrService {
                         openBuys.push(gridLine);
                         lastBuyGrid = gridLine;
                         lastBuyPrice = record.getPrice();
+                        accumulatedQuantity = record.getQuantity();
                     } else {
                         // 没有匹配的已卖出网格，按顺序取下一个新网格
                         if (buyIndex < orderedGridLines.size()) {
                             gridLine = orderedGridLines.get(buyIndex);
                             String typeDesc = record.getType() == TradeType.OPENING_BUY ? "建仓-买入" : "买入";
-                            System.out.println("[OCR导入] " + typeDesc + "记录: 时间=" + record.getTradeTime() +
-                                " 价格=" + record.getPrice() + " → 匹配网格 " + gridLine.getLevel());
-                            buyIndex++;
-                            openBuys.push(gridLine);
-                            lastBuyGrid = gridLine;
-                            lastBuyPrice = record.getPrice();
+                            BigDecimal recordQty = record.getQuantity();
+
+                            // 检查特殊情况：需要拆分到大网
+                            // 如果：当前网格是 MEDIUM，下一个网格是 LARGE，且数量正好是 2 × 默认每网数量 → 拆分给两个网格
+                            if (gridLine.getGridType() == GridType.MEDIUM
+                                && buyIndex + 1 < orderedGridLines.size()
+                                && orderedGridLines.get(buyIndex + 1).getGridType() == GridType.LARGE
+                                && recordQty.compareTo(defaultQuantityPerGrid.multiply(BigDecimal.valueOf(2))) == 0) {
+
+                                // 拆分：1000 给当前 MEDIUM，1000 给下一个 LARGE
+                                BigDecimal halfQty = defaultQuantityPerGrid;
+
+                                // 第一个网格：当前 MEDIUM
+                                GridLine firstGrid = orderedGridLines.get(buyIndex);
+                                System.out.println("[OCR导入] " + typeDesc + "记录: 时间=" + record.getTradeTime() +
+                                    " 价格=" + record.getPrice() + " → 拆分分配: 网格" + firstGrid.getLevel() + "(MEDIUM) " + halfQty);
+
+                                // 第一个网格应用记录（需要新建对象，避免引用同一个record）
+                                OcrTradeRecord firstRecord = new OcrTradeRecord();
+                                firstRecord.setType(record.getType());
+                                firstRecord.setTradeTime(record.getTradeTime());
+                                firstRecord.setPrice(record.getPrice());
+                                firstRecord.setQuantity(halfQty);
+                                firstRecord.setAmount(halfQty.multiply(record.getPrice()).setScale(2, RoundingMode.DOWN));
+                                // 按比例拆分手续费
+                                if (record.getFee() != null) {
+                                    BigDecimal halfFee = record.getFee().divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP);
+                                    firstRecord.setFee(halfFee);
+                                }
+                                normalizeRecordAmounts(firstRecord);
+                                applyRecordToGridLine(firstGrid, firstRecord, strategy, false);
+                                TradeRecord firstTradeRecord = buildTradeRecord(strategy, firstGrid, firstRecord);
+                                tradeRecordRepository.save(firstTradeRecord);
+
+                                buyIndex++;
+                                openBuys.push(firstGrid);
+
+                                // 第二个网格：下一个 LARGE
+                                GridLine secondGrid = orderedGridLines.get(buyIndex);
+                                System.out.println("[OCR导入] " + typeDesc + "记录: 时间=" + record.getTradeTime() +
+                                    " 价格=" + record.getPrice() + " → 拆分分配: 网格" + secondGrid.getLevel() + "(LARGE) " + halfQty);
+
+                                // 第二个网格应用记录（需要新建对象）
+                                OcrTradeRecord secondRecord = new OcrTradeRecord();
+                                secondRecord.setType(record.getType());
+                                secondRecord.setTradeTime(record.getTradeTime());
+                                secondRecord.setPrice(record.getPrice());
+                                secondRecord.setQuantity(halfQty);
+                                secondRecord.setAmount(halfQty.multiply(record.getPrice()).setScale(2, RoundingMode.DOWN));
+                                // 按比例拆分手续费
+                                if (record.getFee() != null) {
+                                    BigDecimal halfFee = record.getFee().divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP);
+                                    secondRecord.setFee(halfFee);
+                                }
+                                normalizeRecordAmounts(secondRecord);
+                                applyRecordToGridLine(secondGrid, secondRecord, strategy, false);
+                                TradeRecord secondTradeRecord = buildTradeRecord(strategy, secondGrid, secondRecord);
+                                tradeRecordRepository.save(secondTradeRecord);
+
+                                buyIndex++;
+                                openBuys.push(secondGrid);
+
+                                // 最后一次分配更新跟踪变量
+                                lastBuyGrid = secondGrid;
+                                lastBuyPrice = record.getPrice();
+                                accumulatedQuantity = halfQty;
+
+                                // 两个网格都处理完了，跳过循环体后续处理
+                                gridLine = null; // 设置为null，避免循环末尾重复处理第一个网格
+                                continue;
+                            } else {
+                                // 正常分配：整个数量给当前网格
+                                System.out.println("[OCR导入] " + typeDesc + "记录: 时间=" + record.getTradeTime() +
+                                    " 价格=" + record.getPrice() + " → 匹配网格 " + gridLine.getLevel());
+                                buyIndex++;
+                                openBuys.push(gridLine);
+                                lastBuyGrid = gridLine;
+                                lastBuyPrice = record.getPrice();
+                                accumulatedQuantity = recordQty;
+                            }
                         } else {
                             System.out.println("[OCR导入] 买入记录超出网格范围: " + record.getTradeTime() + " 价格=" + record.getPrice());
                             lastBuyGrid = null;
                             lastBuyPrice = null;
+                            accumulatedQuantity = BigDecimal.ZERO;
                             continue;
                         }
                     }

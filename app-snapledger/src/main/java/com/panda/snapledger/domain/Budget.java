@@ -18,10 +18,10 @@ public class Budget {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "year", nullable = false)
+    @Column(name = "budget_year", nullable = false)
     private Integer year;
 
-    @Column(name = "month", nullable = false)
+    @Column(name = "budget_month", nullable = false)
     private Integer month;
 
     @Column(name = "amount", nullable = false, precision = 12, scale = 2)

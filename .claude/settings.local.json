@@ -2,6 +2,8 @@
   "permissions": {
     "defaultMode": "dontAsk",
     "allow": [
+	  "Edit",
+	  "Bash",
       "Bash(npm install:*)",
       "Bash(npx vitest:*)",
       "Bash(git init:*)",
