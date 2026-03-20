@@ -32,13 +32,6 @@
       </van-button>
     </div>
 
-    <!-- 最近记录 -->
-    <div class="recent-records">
-      <van-cell-group inset>
-        <van-cell title="最近记录" is-link to="/snap/calendar" />
-      </van-cell-group>
-      <RecordList :records="recentRecords" @edit="goToEdit" />
-    </div>
 
     <!-- 底部导航 -->
     <van-tabbar v-model="activeTab">
@@ -54,8 +47,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMonthCalendar, getRecordsByMonth } from '@/api'
-import RecordList from '@/components/snapledger/RecordList.vue'
+import { getMonthCalendar } from '@/api'
 
 const router = useRouter()
 const activeTab = ref(0)
@@ -64,7 +56,6 @@ const currentMonth = ref(new Date().getMonth() + 1)
 const showMonthPicker = ref(false)
 
 const monthData = ref(null)
-const recentRecords = ref([])
 
 const totalIncome = computed(() => monthData.value?.totalIncome || 0)
 const totalExpense = computed(() => monthData.value?.totalExpense || 0)
@@ -76,19 +67,11 @@ onMounted(async () => {
 
 async function loadData() {
   try {
-    const [calendarRes, recordsRes] = await Promise.all([
-      getMonthCalendar(currentYear.value, currentMonth.value),
-      getRecordsByMonth(currentYear.value, currentMonth.value)
-    ])
+    const calendarRes = await getMonthCalendar(currentYear.value, currentMonth.value)
     monthData.value = calendarRes.data
-    recentRecords.value = (recordsRes.data || []).slice(0, 10)
   } catch (e) {
     console.error('Failed to load data:', e)
   }
-}
-
-function goToEdit(record) {
-  router.push(`/snap/edit/${record.id}`)
 }
 </script>
 
@@ -145,9 +128,5 @@ function goToEdit(record) {
 .scan-btn {
   color: #667eea;
   border-color: #667eea;
-}
-
-.recent-records {
-  padding: 0 16px;
 }
 </style>
