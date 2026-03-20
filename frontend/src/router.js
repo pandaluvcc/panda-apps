@@ -14,8 +14,14 @@ import GridMessageCenter from '@/views/gridtrading/MessageCenter.vue'
 // 工具页面
 import ApkFolderGenerator from '@/views/tools/ApkFolderGenerator.vue'
 
-// 快记账页面（待开发）
-// import SnapHome from '@/views/snapledger/Home.vue'
+// 快记账页面
+import SnapHome from '@/views/snapledger/Home.vue'
+import SnapAddRecord from '@/views/snapledger/AddRecord.vue'
+import SnapCalendar from '@/views/snapledger/Calendar.vue'
+import SnapImport from '@/views/snapledger/Import.vue'
+import SnapScan from '@/views/snapledger/Scan.vue'
+import SnapStats from '@/views/snapledger/Stats.vue'
+import SnapBudget from '@/views/snapledger/Budget.vue'
 
 const routes = [
   // 根路由 - 应用首页
@@ -64,13 +70,55 @@ const routes = [
     meta: { module: 'gridtrading', transition: 'page-slide' }
   },
 
-  // ========== 快记账路由（待开发） ==========
-  // {
-  //   path: '/snap',
-  //   name: 'SnapHome',
-  //   component: SnapHome,
-  //   meta: { module: 'snapledger' }
-  // },
+  // ========== 快记账路由 ==========
+  {
+    path: '/snap',
+    name: 'SnapHome',
+    component: SnapHome,
+    meta: { module: 'snapledger', transition: 'page-fade' }
+  },
+  {
+    path: '/snap/add',
+    name: 'SnapAddRecord',
+    component: SnapAddRecord,
+    meta: { module: 'snapledger', transition: 'page-slide' }
+  },
+  {
+    path: '/snap/edit/:id',
+    name: 'SnapEditRecord',
+    component: SnapAddRecord,
+    meta: { module: 'snapledger', transition: 'page-slide' }
+  },
+  {
+    path: '/snap/calendar',
+    name: 'SnapCalendar',
+    component: SnapCalendar,
+    meta: { module: 'snapledger', transition: 'page-fade' }
+  },
+  {
+    path: '/snap/import',
+    name: 'SnapImport',
+    component: SnapImport,
+    meta: { module: 'snapledger', transition: 'page-fade' }
+  },
+  {
+    path: '/snap/scan',
+    name: 'SnapScan',
+    component: SnapScan,
+    meta: { module: 'snapledger', transition: 'page-fade' }
+  },
+  {
+    path: '/snap/stats',
+    name: 'SnapStats',
+    component: SnapStats,
+    meta: { module: 'snapledger', transition: 'page-fade' }
+  },
+  {
+    path: '/snap/budget',
+    name: 'SnapBudget',
+    component: SnapBudget,
+    meta: { module: 'snapledger', transition: 'page-fade' }
+  },
 
   // ========== 工具路由 ==========
   {
