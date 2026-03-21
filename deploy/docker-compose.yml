@@ -1,0 +1,80 @@
+# 这个文件保存为 /data/docker/platform/docker-compose.yml
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ww2233ee
+      TZ: Asia/Shanghai
+    volumes:
+      - /data/docker/mysql/data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - platform-network
+    deploy:
+      resources:
+        limits:
+          memory: 400M
+        reservations:
+          memory: 200M
+
+  panda-apps:
+    build:
+      context: ./panda-apps  # Dockerfile 在 panda-apps 目录里，就是当前目录下
+      # 不用写 dockerfile 路径了，默认就是 ./panda-apps/Dockerfile
+    container_name: panda-apps
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - TZ=Asia/Shanghai
+    volumes:
+      - /data/docker/platform/panda-apps/logs:/app/logs
+      - /data/docker/platform/panda-apps/config/application-prod.yml:/app/config/application-prod.yml:ro
+    networks:
+      - platform-network
+    deploy:
+      resources:
+        limits:
+          memory: 700M
+        reservations:
+          memory: 350M
+
+  openresty:
+    image: openresty/openresty:alpine
+    container_name: openresty
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /data/docker/openresty/nginx/content:/usr/share/nginx/html:ro
+      - /data/docker/openresty/nginx/conf.d:/etc/nginx/conf.d:ro
+      - openresty-logs:/usr/local/openresty/nginx/logs
+    depends_on:
+      - panda-apps
+    networks:
+      - platform-network
+    deploy:
+      resources:
+        limits:
+          memory: 100M
+        reservations:
+          memory: 50M
+
+networks:
+  platform-network:
+    driver: bridge
+
+volumes:
+  openresty-logs:
+    name: openresty-logs
