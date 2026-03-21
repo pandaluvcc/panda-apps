@@ -73,6 +73,18 @@
                             <exclude>META-INF/**</exclude>
                         </configuration>
                     </execution>
+                    <!-- Copy all third-party dependencies to target/lib -->
+                    <execution>
+                        <id>copy-dependencies</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                            <excludeGroupIds>com.panda</excludeGroupIds>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
         </plugins>

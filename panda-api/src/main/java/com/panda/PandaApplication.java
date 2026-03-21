@@ -15,6 +15,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class PandaApplication {
 
     public static void main(String[] args) {
+        System.out.println("========================================");
+        System.out.println("Starting PandaApplication - DEPLOY CHECK");
+        System.out.println("Build timestamp: " + System.currentTimeMillis());
+        System.out.println("========================================");
         SpringApplication.run(PandaApplication.class, args);
     }
 
