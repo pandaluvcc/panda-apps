@@ -1,4 +1,4 @@
-# application-prod.yml - 生产环境配置
+# 生产环境配置 - 使用 MySQL
 server:
   port: 9090
 
@@ -19,6 +19,11 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
 
   servlet:
     multipart:
@@ -38,7 +43,15 @@ ocr:
     tolerance-percent: 0.005
     time-window-seconds: 30
 
+# 生产环境日志配置 - 按日期切割
 logging:
   level:
     com.panda: INFO
     org.hibernate.SQL: WARN
+  file:
+    name: logs/app.log
+  logback:
+    rolling-policy:
+      file-name-pattern: logs/app_%d{yyyyMMdd}.log
+      max-history: 30
+      total-size-cap: 1GB
