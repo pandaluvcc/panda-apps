@@ -34,13 +34,7 @@
 
 
     <!-- 底部导航 -->
-    <van-tabbar v-model="activeTab">
-      <van-tabbar-item icon="home-o" to="/snap">首页</van-tabbar-item>
-      <van-tabbar-item icon="=" to="/snap/calendar">日历</van-tabbar-item>
-      <van-tabbar-item icon="bar-chart-o" to="/snap/stats">统计</van-tabbar-item>
-      <van-tabbar-item icon="bill-o" to="/snap/budget">预算</van-tabbar-item>
-      <van-tabbar-item icon="setting-o" to="/snap/import">导入</van-tabbar-item>
-    </van-tabbar>
+    <SnapTabbar v-model="activeTab" />
   </div>
 </template>
 
@@ -48,6 +42,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getMonthCalendar } from '@/api'
+import SnapTabbar from '@/components/snapledger/SnapTabbar.vue'
 
 const router = useRouter()
 const activeTab = ref(0)

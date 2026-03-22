@@ -80,6 +80,9 @@
         @cancel="showMonthPicker = false"
       />
     </van-popup>
+
+    <!-- 底部导航 -->
+    <SnapTabbar v-model="activeTab" />
   </div>
 </template>
 
@@ -88,10 +91,12 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getBudget, setBudget } from '@/api/snapledger/budget'
 import { showToast, showSuccessToast } from 'vant'
+import SnapTabbar from '@/components/snapledger/SnapTabbar.vue'
 
 const route = useRoute()
 const showMonthPicker = ref(false)
 const saving = ref(false)
+const activeTab = ref(2) // 预算页为第三个 tab
 
 const currentYear = ref(new Date().getFullYear())
 const currentMonth = ref(new Date().getMonth() + 1)
@@ -173,6 +178,7 @@ onMounted(() => {
 .budget-page {
   min-height: 100vh;
   background: #f7f8fa;
+  padding-bottom: 80px;
 }
 
 .budget-content {

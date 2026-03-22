@@ -92,6 +92,9 @@
         @cancel="showMonthPicker = false"
       />
     </van-popup>
+
+    <!-- 底部导航 -->
+    <SnapTabbar v-model="activeTab" />
   </div>
 </template>
 
@@ -102,9 +105,11 @@ import { Chart } from 'chart.js'
 import { getMonthlyStats } from '@/api/snapledger/stats'
 import { getBudget } from '@/api/snapledger/budget'
 import { showToast } from 'vant'
+import SnapTabbar from '@/components/snapledger/SnapTabbar.vue'
 
 const route = useRoute()
 const showMonthPicker = ref(false)
+const activeTab = ref(1) // 统计页为第二个 tab
 
 const currentYear = ref(new Date().getFullYear())
 const currentMonth = ref(new Date().getMonth() + 1)
@@ -213,7 +218,7 @@ onMounted(() => {
 .stats-page {
   min-height: 100vh;
   background: #f7f8fa;
-  padding-bottom: 20px;
+  padding-bottom: 80px;
 }
 
 .stats-content {

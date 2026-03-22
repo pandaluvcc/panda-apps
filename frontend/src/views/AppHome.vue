@@ -31,7 +31,7 @@
         </div>
 
         <!-- 快记账 -->
-        <div class="app-card" @click="goToApp('/snap')">
+        <div class="app-card" @click="goToApp('/snap/calendar')">
           <div class="app-icon">
             <el-icon :size="32"><Wallet /></el-icon>
           </div>

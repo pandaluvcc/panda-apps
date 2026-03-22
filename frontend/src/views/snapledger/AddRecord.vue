@@ -16,6 +16,9 @@
         删除
       </van-button>
     </div>
+
+    <!-- 底部导航 -->
+    <SnapTabbar v-model="activeTab" />
   </div>
 </template>
 
@@ -24,11 +27,13 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { createRecord, updateRecord, deleteRecord } from '@/api'
 import RecordForm from '@/components/snapledger/RecordForm.vue'
+import SnapTabbar from '@/components/snapledger/SnapTabbar.vue'
 
 const router = useRouter()
 const route = useRoute()
 
 const isEdit = computed(() => !!route.params.id)
+const activeTab = ref(-1) // 记账页不在tab导航中，但显示底部栏
 
 const form = ref({
   recordType: '支出',
@@ -63,7 +68,7 @@ async function save() {
     } else {
       await createRecord(form.value)
     }
-    router.push('/snap/calendar')
+    router.push('/snap')
   } catch (e) {
     console.error('Failed to save:', e)
     alert('保存失败')
@@ -78,7 +83,7 @@ async function remove() {
   deleting.value = true
   try {
     await deleteRecord(route.params.id)
-    router.push('/snap/calendar')
+    router.push('/snap')
   } catch (e) {
     console.error('Failed to delete:', e)
     alert('删除失败')
@@ -92,6 +97,7 @@ async function remove() {
 .add-record {
   min-height: 100vh;
   background: #f7f8fa;
+  padding-bottom: 80px;
 }
 
 .actions {

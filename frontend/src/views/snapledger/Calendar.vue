@@ -1,12 +1,11 @@
 <template>
   <div class="calendar-page">
-    <van-nav-bar title="日历" />
-
     <!-- 月份切换 -->
     <div class="month-nav">
-      <van-icon name="arrow-left" @click="prevMonth" />
-      <span class="current-month">{{ year }}年{{ month }}月</span>
-      <van-icon name="arrow-right" @click="nextMonth" />
+      <div class="month-selector" @click="showMonthPicker = true">
+        <span class="current-month">{{ year }}年{{ month }}月</span>
+        <van-icon name="arrow-down" class="dropdown-icon" />
+      </div>
     </div>
 
     <!-- 日历网格 -->
@@ -16,6 +15,7 @@
       :days="monthData?.days || []"
       :selected-date="selectedDate"
       @select="onDateSelect"
+      @swipe="onSwipe"
     />
 
     <!-- 当日记录列表 -->
@@ -26,11 +26,19 @@
       <RecordList :records="dayRecords" @edit="goToEdit" />
     </div>
 
-    <!-- 添加按钮 -->
-    <van-floating-bubble
-      icon="plus"
-      @click="$router.push('/snap/add')"
-    />
+    <!-- 月份选择器弹窗 -->
+    <van-popup v-model:show="showMonthPicker" position="bottom" round>
+      <van-date-picker
+        v-model="selectedMonthValue"
+        title="选择月份"
+        :columns-type="['year', 'month']"
+        @confirm="onMonthConfirm"
+        @cancel="showMonthPicker = false"
+      />
+    </van-popup>
+
+    <!-- 底部导航 -->
+    <SnapTabbar v-model="activeTab" />
   </div>
 </template>
 
@@ -40,14 +48,18 @@ import { useRouter } from 'vue-router'
 import { getMonthCalendar, getRecordsByDate } from '@/api'
 import CalendarGrid from '@/components/snapledger/CalendarGrid.vue'
 import RecordList from '@/components/snapledger/RecordList.vue'
+import SnapTabbar from '@/components/snapledger/SnapTabbar.vue'
 
 const router = useRouter()
 
+const activeTab = ref(-1) // 日历页不在底部导航中
 const year = ref(new Date().getFullYear())
 const month = ref(new Date().getMonth() + 1)
 const selectedDate = ref(new Date())
 const monthData = ref(null)
 const dayRecords = ref([])
+const showMonthPicker = ref(false)
+const selectedMonthValue = ref([year.value.toString(), month.value.toString()])
 
 onMounted(async () => {
   await loadMonthData()
@@ -84,6 +96,7 @@ function prevMonth() {
   } else {
     month.value--
   }
+  updateSelectedMonthValue()
 }
 
 function nextMonth() {
@@ -93,11 +106,31 @@ function nextMonth() {
   } else {
     month.value++
   }
+  updateSelectedMonthValue()
+}
+
+function updateSelectedMonthValue() {
+  selectedMonthValue.value = [year.value.toString(), month.value.toString()]
+}
+
+function onMonthConfirm({ selectedValues }) {
+  year.value = parseInt(selectedValues[0])
+  month.value = parseInt(selectedValues[1])
+  updateSelectedMonthValue()
+  showMonthPicker.value = false
 }
 
 function onDateSelect(date) {
   selectedDate.value = date
   loadDayRecords()
+}
+
+function onSwipe(direction) {
+  if (direction === 'prev') {
+    prevMonth()
+  } else {
+    nextMonth()
+  }
 }
 
 function formatDate(date) {
@@ -118,15 +151,35 @@ function goToEdit(record) {
 
 .month-nav {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   padding: 16px;
   background: white;
 }
 
+.month-selector {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+}
+
+.month-selector:active {
+  background-color: #f7f8fa;
+}
+
 .current-month {
   font-size: 16px;
   font-weight: bold;
+  color: #323233;
+}
+
+.dropdown-icon {
+  font-size: 12px;
+  color: #969799;
 }
 
 .day-records {
