@@ -1,6 +1,7 @@
 package com.panda.snapledger.controller;
 
 import com.panda.snapledger.service.csvimport.MozeCsvImporter;
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,6 +22,7 @@ public class ImportController {
     }
 
     @PostMapping(value = "/csv", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "导入CSV记账数据")
     public Map<String, Object> importCsv(@RequestParam("file") MultipartFile file) throws IOException {
         MozeCsvImporter.ImportResult result = mozeCsvImporter.importFromCsv(file);
         Map<String, Object> response = new HashMap<>();

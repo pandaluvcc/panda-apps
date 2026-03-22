@@ -6,7 +6,7 @@ import api from './index'
  * @returns {Promise} 智能建议结果
  */
 export function getSuggestion(strategyId) {
-  return api.get(`/strategies/${strategyId}/suggestion`).then((response) => response.data)
+  return api.get(`/strategies/${strategyId}/suggestion`)
 }
 
 /**
@@ -16,7 +16,7 @@ export function getSuggestion(strategyId) {
  * @returns {Promise}
  */
 export function updateLastPrice(strategyId, lastPrice) {
-  return api.put(`/strategies/${strategyId}/last-price`, { lastPrice }).then((response) => response.data)
+  return api.put(`/strategies/${strategyId}/last-price`, { lastPrice })
 }
 
 /**
@@ -26,9 +26,7 @@ export function updateLastPrice(strategyId, lastPrice) {
  * @returns {Promise}
  */
 export function getSmartSuggestions(strategyId, currentPrice) {
-  return api
-    .get(`/suggestions/${strategyId}`, {
-      params: { currentPrice }
-    })
-    .then((response) => response.data)
+  return api.get(`/suggestions/${strategyId}`, {
+    params: { currentPrice }
+  })
 }

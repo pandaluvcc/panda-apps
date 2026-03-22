@@ -120,7 +120,8 @@ const progressColor = computed(() => {
 async function loadBudget() {
   try {
     const res = await getBudget(currentYear.value, currentMonth.value)
-    budget.value = res.data
+    // axios 拦截器已解包，res 直接是数据
+    budget.value = res
   } catch (e) {
     showToast('加载预算失败: ' + e.message)
   }

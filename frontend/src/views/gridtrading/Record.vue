@@ -193,11 +193,12 @@ const loadGrids = async () => {
   if (!strategyId.value) return
   try {
     const res = await getGridLines(strategyId.value)
-    gridLines.value = res.data.gridPlans || []
+    // axios 拦截器已解包，res 直接是数据
+    gridLines.value = res.gridPlans || []
 
     // 获取单格金额
-    if (res.data.strategy?.amountPerGrid) {
-      amountPerGrid.value = Number(res.data.strategy.amountPerGrid)
+    if (res.strategy?.amountPerGrid) {
+      amountPerGrid.value = Number(res.strategy.amountPerGrid)
     }
 
     // 预选网格
@@ -214,7 +215,7 @@ const loadGrids = async () => {
     }
   } catch (error) {
     console.error('加载失败:', error)
-    ElMessage.error('加载失败')
+    ElMessage.error(error.message || '加载失败')
   }
 }
 

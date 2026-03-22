@@ -1,6 +1,5 @@
 package com.panda.gridtrading.domain;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -27,7 +26,6 @@ public class TradeRecord {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "strategy_id", nullable = false)
-    @JsonIgnore
     private Strategy strategy;
 
     /**
@@ -35,7 +33,6 @@ public class TradeRecord {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "grid_line_id", nullable = false)
-    @JsonIgnore
     private GridLine gridLine;
 
     /**

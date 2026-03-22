@@ -6,6 +6,7 @@ import com.panda.gridtrading.controller.dto.OcrRematchRequest;
 import com.panda.gridtrading.controller.dto.StrategyResponse;
 import com.panda.gridtrading.service.ocr.ImportService;
 import com.panda.gridtrading.service.ocr.OcrService;
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -34,6 +35,7 @@ public class OcrController {
      * 上传截图并识别
      */
     @PostMapping(value = "/recognize", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "OCR识别交易截图")
     public OcrRecognizeResponse recognize(
             @RequestParam(value = "files", required = false) List<MultipartFile> files,
             @RequestParam(value = "file", required = false) MultipartFile file,
@@ -54,6 +56,7 @@ public class OcrController {
      * 批量导入确认后的记录
      */
     @PostMapping("/import")
+    @Operation(summary = "批量导入交易记录")
     public Map<String, Object> batchImport(@RequestBody BatchImportRequest request) {
         return importService.batchImport(request);
     }
@@ -62,6 +65,7 @@ public class OcrController {
      * 通过成交截图创建策略
      */
     @PostMapping(value = "/import-create", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "通过截图创建策略")
     public StrategyResponse importCreate(
             @RequestParam(value = "files", required = false) List<MultipartFile> files,
             @RequestParam(value = "file", required = false) MultipartFile file,
@@ -86,6 +90,7 @@ public class OcrController {
      * OCR重新匹配（支持人工标记建仓/清仓）
      */
     @PostMapping("/rematch")
+    @Operation(summary = "OCR重新匹配")
     public OcrRecognizeResponse rematch(@RequestBody OcrRematchRequest request) {
         if (request == null) {
             return OcrRecognizeResponse.error("request is required");

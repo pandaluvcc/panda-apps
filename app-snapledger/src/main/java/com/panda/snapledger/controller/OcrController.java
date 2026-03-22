@@ -6,6 +6,7 @@ import com.panda.snapledger.controller.dto.OcrResultDTO;
 import com.panda.snapledger.controller.dto.RecordDTO;
 import com.panda.snapledger.service.PaymentScreenshotParser;
 import com.panda.snapledger.service.RecordService;
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -39,6 +40,7 @@ public class OcrController {
      * Upload image and recognize transaction details.
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "OCR识别支付截图")
     public ResponseEntity<OcrResultDTO> recognize(@RequestParam("file") MultipartFile file) {
         if (file == null || file.isEmpty()) {
             return ResponseEntity.badRequest()
@@ -98,6 +100,7 @@ public class OcrController {
      * Confirm and save the recognized record.
      */
     @PostMapping("/confirm")
+    @Operation(summary = "确认并保存OCR识别记录")
     public ResponseEntity<RecordDTO> confirm(@RequestBody OcrConfirmDTO dto) {
         if (dto == null || dto.getAmount() == null) {
             return ResponseEntity.badRequest().build();

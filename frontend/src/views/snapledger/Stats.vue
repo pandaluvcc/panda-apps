@@ -126,7 +126,8 @@ let categoryChart = null
 async function loadStats() {
   try {
     const res = await getMonthlyStats(currentYear.value, currentMonth.value)
-    stats.value = res.data || {
+    // axios 拦截器已解包，res 直接是数据
+    stats.value = res || {
       totalIncome: 0,
       totalExpense: 0,
       balance: 0,
@@ -141,7 +142,8 @@ async function loadStats() {
 async function loadBudget() {
   try {
     const res = await getBudget(currentYear.value, currentMonth.value)
-    budget.value = res.data
+    // axios 拦截器已解包，res 直接是数据
+    budget.value = res
   } catch (e) {
     console.error('Failed to load budget:', e)
   }

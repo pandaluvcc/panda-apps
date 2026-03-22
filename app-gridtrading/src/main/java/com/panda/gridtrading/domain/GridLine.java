@@ -1,6 +1,5 @@
 package com.panda.gridtrading.domain;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -27,7 +26,6 @@ public class GridLine {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "strategy_id", nullable = false)
-    @JsonIgnoreProperties({"gridLines", "tradeRecords"})
     private Strategy strategy;
 
     /**

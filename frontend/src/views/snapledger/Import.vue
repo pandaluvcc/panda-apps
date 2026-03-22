@@ -43,12 +43,13 @@ async function handleUpload(file) {
   file.status = 'uploading'
   try {
     const res = await importCsv(file.file)
-    result.value = res.data
+    // axios 拦截器已解包，res 直接是数据
+    result.value = res
     file.status = 'done'
   } catch (e) {
     file.status = 'failed'
     console.error('Import failed:', e)
-    alert('导入失败: ' + (e.response?.data?.message || e.message))
+    alert('导入失败: ' + (e.message || e))
   }
 }
 </script>

@@ -59,7 +59,7 @@ export function updateActualBuyPrice(gridLineId, actualBuyPrice) {
  * @returns {Promise}
  */
 export function resumeBuy(strategyId, gridId, data) {
-  return api.post(`/strategies/${strategyId}/grids/${gridId}/resume-buy`, data).then((response) => response.data)
+  return api.post(`/strategies/${strategyId}/grids/${gridId}/resume-buy`, data)
 }
 
 /**
@@ -68,5 +68,5 @@ export function resumeBuy(strategyId, gridId, data) {
  * @returns {Promise}
  */
 export function getDeferredGrids(strategyId) {
-  return api.get(`/strategies/${strategyId}/deferred-grids`).then((response) => response.data)
+  return api.get(`/strategies/${strategyId}/deferred-grids`)
 }

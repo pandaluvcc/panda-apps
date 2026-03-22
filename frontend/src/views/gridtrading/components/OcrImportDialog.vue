@@ -117,10 +117,11 @@ const handleParse = async () => {
       files: ocrFiles.value,
       strategyId: props.strategyId
     })
-    parsedRecords.value = res.data.records || []
+    // axios 拦截器已解包，res 直接是数据
+    parsedRecords.value = res.records || []
     ElMessage.success(`识别成功，共${parsedRecords.value.length}条记录`)
   } catch (e) {
-    ElMessage.error('识别失败：' + (e.response?.data?.message || e.message))
+    ElMessage.error('识别失败：' + (e.message || e))
   } finally {
     parsing.value = false
   }
@@ -138,10 +139,11 @@ const handleRematch = async () => {
       strategyId: props.strategyId,
       records: parsedRecords.value
     })
-    parsedRecords.value = res.data.records || []
+    // axios 拦截器已解包，res 直接是数据
+    parsedRecords.value = res.records || []
     ElMessage.success('重新匹配完成')
   } catch (e) {
-    ElMessage.error('匹配失败：' + (e.response?.data?.message || e.message))
+    ElMessage.error('匹配失败：' + (e.message || e))
   } finally {
     rematching.value = false
   }
@@ -163,7 +165,7 @@ const handleImport = async () => {
     emit('import-success')
     handleClose()
   } catch (e) {
-    ElMessage.error('导入失败：' + (e.response?.data?.message || e.message))
+    ElMessage.error('导入失败：' + (e.message || e))
   } finally {
     importing.value = false
   }

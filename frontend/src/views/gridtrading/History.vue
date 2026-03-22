@@ -149,7 +149,8 @@ const loadData = async () => {
   loading.value = true
   try {
     const res = await getAllStrategies()
-    strategies.value = res.data
+    // axios 拦截器已解包，res 直接是数据
+    strategies.value = res
 
     if (strategies.value.length > 0) {
       selectedStrategyId.value = strategies.value[0].id
@@ -168,7 +169,8 @@ const loadRecords = async () => {
 
   try {
     const res = await getTradeRecords(selectedStrategyId.value)
-    records.value = res.data || []
+    // axios 拦截器已解包，res 直接是数据
+    records.value = res || []
   } catch (error) {
     console.error('加载记录失败:', error)
   }

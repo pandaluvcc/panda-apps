@@ -68,7 +68,8 @@ onMounted(async () => {
 async function loadData() {
   try {
     const calendarRes = await getMonthCalendar(currentYear.value, currentMonth.value)
-    monthData.value = calendarRes.data
+    // axios 拦截器已解包，res 直接是数据
+    monthData.value = calendarRes
   } catch (e) {
     console.error('Failed to load data:', e)
   }

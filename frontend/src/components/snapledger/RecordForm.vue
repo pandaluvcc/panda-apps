@@ -135,8 +135,9 @@ onMounted(async () => {
       getCategories(),
       getAccounts()
     ])
-    categories.value = catRes.data || []
-    accounts.value = accRes.data || []
+    // axios 拦截器已解包，res 直接是数据
+    categories.value = catRes || []
+    accounts.value = accRes || []
   } catch (e) {
     console.error('Failed to load categories/accounts:', e)
   }

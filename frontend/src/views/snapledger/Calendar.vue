@@ -59,7 +59,8 @@ watch([year, month], loadMonthData)
 async function loadMonthData() {
   try {
     const res = await getMonthCalendar(year.value, month.value)
-    monthData.value = res.data
+    // axios 拦截器已解包，res 直接是数据
+    monthData.value = res
   } catch (e) {
     console.error('Failed to load calendar:', e)
   }
@@ -69,7 +70,8 @@ async function loadDayRecords() {
   try {
     const dateStr = selectedDate.value.toISOString().split('T')[0]
     const res = await getRecordsByDate(dateStr)
-    dayRecords.value = res.data || []
+    // axios 拦截器已解包，res 直接是数据
+    dayRecords.value = res || []
   } catch (e) {
     console.error('Failed to load records:', e)
   }

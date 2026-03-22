@@ -230,7 +230,8 @@ const submitImport = async () => {
       symbol: form.value.symbol,
       gridCalculationMode: form.value.gridCalculationMode
     })
-    const strategyId = response.data?.id
+    // axios 拦截器已解包，response 直接是 data
+    const strategyId = response?.id
     if (!strategyId) {
       ElMessage.error('导入失败：无法获取策略ID')
       return
@@ -241,7 +242,7 @@ const submitImport = async () => {
     }, 300)
   } catch (error) {
     console.error('导入失败:', error)
-    ElMessage.error(error.response?.data?.message || '导入失败')
+    ElMessage.error(error.message || '导入失败')
   } finally {
     importing.value = false
   }
@@ -268,7 +269,8 @@ const handleSubmit = async () => {
   try {
     const response = await createStrategy(requestData)
     console.log('创建策略响应:', response)
-    const strategyId = response.data?.id
+    // axios 拦截器已解包，response 直接是 data
+    const strategyId = response?.id
     if (!strategyId) {
       console.error('创建响应中没有id:', response)
       ElMessage.error('创建失败：无法获取策略ID')
@@ -281,7 +283,7 @@ const handleSubmit = async () => {
     }, 300)
   } catch (error) {
     console.error('创建失败:', error)
-    ElMessage.error(error.response?.data?.message || '创建失败')
+    ElMessage.error(error.message || '创建失败')
   } finally {
     submitting.value = false
   }

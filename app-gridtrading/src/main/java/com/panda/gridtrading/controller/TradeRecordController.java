@@ -1,14 +1,17 @@
 package com.panda.gridtrading.controller;
 
+import com.panda.gridtrading.controller.dto.TradeRecordDto;
 import com.panda.gridtrading.domain.Strategy;
 import com.panda.gridtrading.domain.TradeRecord;
 import com.panda.gridtrading.repository.StrategyRepository;
 import com.panda.gridtrading.repository.TradeRecordRepository;
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 成交记录 Controller
@@ -32,10 +35,13 @@ public class TradeRecordController {
      * GET /api/strategies/{id}/trades
      */
     @GetMapping("/strategies/{id}/trades")
-    public List<TradeRecord> getStrategyTrades(@PathVariable Long id) {
+    @Operation(summary = "获取策略成交记录")
+    public List<TradeRecordDto> getStrategyTrades(@PathVariable Long id) {
         Strategy strategy = strategyRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("策略不存在"));
-        return tradeRecordRepository.findByStrategyOrderByTradeTimeDesc(strategy);
+        return tradeRecordRepository.findByStrategyOrderByTradeTimeDesc(strategy).stream()
+                .map(TradeRecordDto::fromEntity)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -43,10 +49,11 @@ public class TradeRecordController {
      * PUT /api/trades/{id}/fee
      */
     @PutMapping("/trades/{id}/fee")
-    public TradeRecord updateTradeFee(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+    @Operation(summary = "更新成交记录手续费")
+    public TradeRecordDto updateTradeFee(@PathVariable Long id, @RequestBody Map<String, Object> request) {
         TradeRecord record = tradeRecordRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("成交记录不存在"));
-        
+
         // 更新手续费
         if (request.containsKey("fee")) {
             Object feeObj = request.get("fee");
@@ -74,7 +81,8 @@ public class TradeRecordController {
             }
         }
 
-        return tradeRecordRepository.save(record);
+        TradeRecord saved = tradeRecordRepository.save(record);
+        return TradeRecordDto.fromEntity(saved);
     }
 
     /**
@@ -82,15 +90,16 @@ public class TradeRecordController {
      * GET /api/strategies/{id}/total-fee
      */
     @GetMapping("/strategies/{id}/total-fee")
+    @Operation(summary = "获取策略累计手续费")
     public Map<String, BigDecimal> getStrategyTotalFee(@PathVariable Long id) {
         Strategy strategy = strategyRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("策略不存在"));
-        
+
         List<TradeRecord> records = tradeRecordRepository.findByStrategyOrderByTradeTimeDesc(strategy);
         BigDecimal totalFee = records.stream()
                 .map(r -> r.getFee() != null ? r.getFee() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        
+
         return Map.of("totalFee", totalFee);
     }
 }

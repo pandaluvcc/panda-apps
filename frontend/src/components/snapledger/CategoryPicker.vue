@@ -57,7 +57,8 @@ watch(() => props.show, async (show) => {
   if (show && categories.value.length === 0) {
     try {
       const res = await getCategories()
-      categories.value = res.data || []
+      // axios 拦截器已解包，res 直接是数据
+      categories.value = res || []
     } catch (e) {
       console.error('Failed to load categories:', e)
     }

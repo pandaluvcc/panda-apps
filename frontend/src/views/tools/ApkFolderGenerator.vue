@@ -110,10 +110,11 @@ const generate = async () => {
       }
     })
 
-    result.value = response.data
+    // axios 拦截器已解包，response 直接是数据
+    result.value = response
     ElMessage.success('生成完成')
   } catch (error) {
-    ElMessage.error('生成失败：' + (error.response?.data?.message || error.message))
+    ElMessage.error('生成失败：' + (error.message || error))
   } finally {
     loading.value = false
   }

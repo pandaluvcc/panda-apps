@@ -9,6 +9,7 @@ import com.panda.gridtrading.repository.GridLineRepository;
 import com.panda.gridtrading.repository.StrategyRepository;
 import com.panda.gridtrading.service.StrategyService;
 import com.panda.gridtrading.service.suggestion.SuggestionService;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -43,6 +44,7 @@ public class StrategyController {
      * 获取所有策略列表
      */
     @GetMapping
+    @Operation(summary = "获取所有策略列表")
     public List<StrategyResponse> getAllStrategies() {
         return strategyService.getAllStrategies();
     }
@@ -51,6 +53,7 @@ public class StrategyController {
      * 根据 ID 获取策略详情
      */
     @GetMapping("/{id}")
+    @Operation(summary = "获取策略详情")
     public StrategyResponse getStrategy(@PathVariable Long id) {
         return strategyService.getStrategyById(id);
     }
@@ -59,6 +62,7 @@ public class StrategyController {
      * 获取策略完整详情
      */
     @GetMapping("/{id}/detail")
+    @Operation(summary = "获取策略完整详情")
     public StrategyDetailDTO getStrategyDetail(@PathVariable Long id) {
         return strategyService.getStrategyDetail(id);
     }
@@ -67,6 +71,7 @@ public class StrategyController {
      * 获取网格计划表
      */
     @GetMapping("/{id}/grid-plans")
+    @Operation(summary = "获取网格计划表")
     public GridPlanResponse getGridPlans(@PathVariable Long id) {
         return strategyService.getGridPlans(id);
     }
@@ -75,6 +80,7 @@ public class StrategyController {
      * 根据价格推荐网格和交易类型
      */
     @GetMapping("/{id}/suggest")
+    @Operation(summary = "根据价格推荐网格")
     public GridSuggestionDTO suggestGridByPrice(
             @PathVariable Long id,
             @RequestParam BigDecimal price) {
@@ -88,6 +94,7 @@ public class StrategyController {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "创建新策略")
     public StrategyResponse createStrategy(@RequestBody CreateStrategyRequest request) {
         return strategyService.createStrategy(request);
     }
@@ -99,6 +106,7 @@ public class StrategyController {
      */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "删除策略")
     public void deleteStrategy(@PathVariable Long id) {
         strategyService.deleteStrategy(id);
     }
@@ -109,6 +117,7 @@ public class StrategyController {
      * 执行交易录入
      */
     @PostMapping("/{id}/tick")
+    @Operation(summary = "执行交易录入")
     public TickResponse executeTick(@PathVariable Long id, @RequestBody TickRequest request) {
         return strategyService.executeTick(id, request);
     }
@@ -117,6 +126,7 @@ public class StrategyController {
      * 更新最新价格
      */
     @PutMapping("/{id}/last-price")
+    @Operation(summary = "更新最新价格")
     public StrategyDetailDTO updateLastPrice(
             @PathVariable Long id,
             @RequestBody UpdateLastPriceRequest request) {
@@ -127,6 +137,7 @@ public class StrategyController {
      * 更新网格计划买入价
      */
     @PutMapping("/grid-lines/{gridLineId}/update-plan-buy-price")
+    @Operation(summary = "更新网格计划买入价")
     public void updatePlanBuyPrice(
             @PathVariable Long gridLineId,
             @RequestParam BigDecimal newBuyPrice) {
@@ -137,6 +148,7 @@ public class StrategyController {
      * 更新网格实际买入价
      */
     @PutMapping("/grid-lines/actual-buy-price")
+    @Operation(summary = "更新网格实际买入价")
     public void updateActualBuyPrice(@RequestBody UpdateActualBuyPriceRequest request) {
         strategyService.updateActualBuyPrice(request.getGridLineId(), request.getActualBuyPrice());
     }
@@ -147,6 +159,7 @@ public class StrategyController {
      * 获取智能建议
      */
     @GetMapping("/{id}/suggestion")
+    @Operation(summary = "获取智能建议")
     public Map<String, Object> getSuggestion(
             @PathVariable Long id,
             @RequestParam(required = false) BigDecimal currentPrice) {
@@ -169,6 +182,7 @@ public class StrategyController {
      * 获取所有暂缓网格
      */
     @GetMapping("/{id}/deferred-grids")
+    @Operation(summary = "获取所有暂缓网格")
     public List<SuggestionResponse.DeferredGrid> getDeferredGrids(@PathVariable Long id) {
         strategyRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("策略不存在"));
@@ -192,6 +206,7 @@ public class StrategyController {
      * 手动补买暂缓网格
      */
     @PostMapping("/{id}/grids/{gridId}/resume-buy")
+    @Operation(summary = "手动补买暂缓网格")
     public Map<String, Object> resumeBuy(
             @PathVariable Long id,
             @PathVariable Long gridId,

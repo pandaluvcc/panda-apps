@@ -80,7 +80,7 @@ const loadHomeData = async () => {
     // 同时获取建议和风险数据
     await Promise.all([fetchSuggestions(strategyIds), fetchRisks(strategyIds)])
   } catch (e) {
-    ElMessage.error('加载失败：' + (e.response?.data?.message || e.message))
+    ElMessage.error('加载失败：' + (e.message || e))
   }
 }
 

@@ -1,6 +1,7 @@
 package com.panda.gridtrading.controller;
 
 import com.panda.gridtrading.service.suggestion.SuggestionService;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,7 @@ public class SuggestionController {
      * 获取智能建议
      */
     @GetMapping("/{strategyId}")
+    @Operation(summary = "获取智能建议")
     public ResponseEntity<Map<String, Object>> getSmartSuggestions(
             @PathVariable Long strategyId,
             @RequestParam BigDecimal currentPrice) {

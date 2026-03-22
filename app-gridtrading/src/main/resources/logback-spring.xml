@@ -3,11 +3,10 @@
     <!-- 日志存放路径 -->
     <property name="LOG_PATH" value="${LOG_PATH:-/app/logs}"/>
 
-    <!-- 控制台输出 -->
+    <!-- 控制台输出 - 使用系统默认编码（Windows为GBK，Linux为UTF-8） -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
-            <charset>UTF-8</charset>
         </encoder>
     </appender>
 

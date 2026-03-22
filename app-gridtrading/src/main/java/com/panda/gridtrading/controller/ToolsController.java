@@ -3,6 +3,7 @@ package com.panda.gridtrading.controller;
 import com.panda.gridtrading.controller.dto.ApkFolderResultDTO;
 import com.panda.gridtrading.service.tools.ApkFolderGeneratorService;
 import com.panda.gridtrading.service.tools.KnowledgeBaseExportService;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -27,6 +28,7 @@ public class ToolsController {
     private KnowledgeBaseExportService knowledgeBaseExportService;
 
     @PostMapping("/apk-folder-generator")
+    @Operation(summary = "生成APK文件夹")
     public ResponseEntity<ApkFolderResultDTO> generateApkFolders(
             @RequestParam("file") MultipartFile file,
             @RequestParam("targetPath") String targetPath) throws IOException {
@@ -43,6 +45,7 @@ public class ToolsController {
     }
 
     @PostMapping("/knowledge-base-export")
+    @Operation(summary = "导出知识库")
     public ResponseEntity<byte[]> exportKnowledgeBase(
             @RequestParam("file") MultipartFile file) throws IOException {
 

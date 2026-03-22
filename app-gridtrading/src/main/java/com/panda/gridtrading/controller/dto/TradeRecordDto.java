@@ -17,8 +17,9 @@ public class TradeRecordDto {
     private BigDecimal quantity;
     private BigDecimal amount;
     private BigDecimal fee;
-    private LocalDateTime executedAt;
-    private Integer gridLineLevel;
+    private LocalDateTime tradeTime;
+    private Integer gridLevel;
+    private Long gridLineId;
 
     public static TradeRecordDto fromEntity(TradeRecord record) {
         TradeRecordDto dto = new TradeRecordDto();
@@ -28,8 +29,9 @@ public class TradeRecordDto {
         dto.setQuantity(record.getQuantity());
         dto.setAmount(record.getAmount());
         dto.setFee(record.getFee());
-        dto.setExecutedAt(record.getTradeTime());
-        dto.setGridLineLevel(record.getGridLevel());
+        dto.setTradeTime(record.getTradeTime());
+        dto.setGridLevel(record.getGridLevel());
+        dto.setGridLineId(record.getGridLineId());
         return dto;
     }
 
@@ -81,19 +83,27 @@ public class TradeRecordDto {
         this.fee = fee;
     }
 
-    public LocalDateTime getExecutedAt() {
-        return executedAt;
+    public LocalDateTime getTradeTime() {
+        return tradeTime;
     }
 
-    public void setExecutedAt(LocalDateTime executedAt) {
-        this.executedAt = executedAt;
+    public void setTradeTime(LocalDateTime tradeTime) {
+        this.tradeTime = tradeTime;
     }
 
-    public Integer getGridLineLevel() {
-        return gridLineLevel;
+    public Integer getGridLevel() {
+        return gridLevel;
     }
 
-    public void setGridLineLevel(Integer gridLineLevel) {
-        this.gridLineLevel = gridLineLevel;
+    public void setGridLevel(Integer gridLevel) {
+        this.gridLevel = gridLevel;
+    }
+
+    public Long getGridLineId() {
+        return gridLineId;
+    }
+
+    public void setGridLineId(Long gridLineId) {
+        this.gridLineId = gridLineId;
     }
 }

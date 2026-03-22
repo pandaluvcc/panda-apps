@@ -197,8 +197,9 @@ async function loadData() {
       getAccounts(),
       getCategories()
     ])
-    accounts.value = accountsRes.data || []
-    categories.value = categoriesRes.data || []
+    // axios 拦截器已解包，res 直接是数据
+    accounts.value = accountsRes || []
+    categories.value = categoriesRes || []
   } catch (e) {
     console.error('Failed to load data:', e)
   }
@@ -213,22 +214,23 @@ async function handleUpload(file) {
 
   try {
     const res = await recognizeImage(file.file)
-    result.value = res.data
+    // axios 拦截器已解包，res 直接是数据
+    result.value = res
 
-    if (res.data.success && res.data.record) {
+    if (res.success && res.record) {
       // Pre-fill form
-      form.amount = res.data.record.amount?.toString() || ''
-      form.recordType = res.data.record.recordType || '支出'
-      form.merchant = res.data.record.merchant || ''
-      form.date = res.data.record.date || ''
-      form.account = res.data.record.account || ''
-      form.description = res.data.record.description || ''
+      form.amount = res.record.amount?.toString() || ''
+      form.recordType = res.record.recordType || '支出'
+      form.merchant = res.record.merchant || ''
+      form.date = res.record.date || ''
+      form.account = res.record.account || ''
+      form.description = res.record.description || ''
     }
 
     file.status = 'done'
   } catch (e) {
     file.status = 'failed'
-    result.value = { success: false, message: e.response?.data?.message || e.message }
+    result.value = { success: false, message: e.message || e }
   } finally {
     loading.value = false
   }
@@ -278,7 +280,7 @@ async function handleConfirm() {
     showSuccessToast('保存成功')
     router.push('/snap/calendar')
   } catch (e) {
-    showToast('保存失败: ' + (e.response?.data?.message || e.message))
+    showToast('保存失败: ' + (e.message || e))
   } finally {
     saving.value = false
   }

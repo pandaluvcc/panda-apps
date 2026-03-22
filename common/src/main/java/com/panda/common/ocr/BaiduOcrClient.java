@@ -1,6 +1,7 @@
 package com.panda.common.ocr;
 
 import com.baidu.aip.ocr.AipOcr;
+import lombok.extern.slf4j.Slf4j;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +15,7 @@ import java.util.HashMap;
  * Baidu OCR client wrapper - shared across modules.
  */
 @Service
+@Slf4j
 public class BaiduOcrClient {
 
     private final AipOcr client;
@@ -49,7 +51,12 @@ public class BaiduOcrClient {
         options.put("language_type", "CHN_ENG");
         options.put("detect_direction", "true");
 
-        JSONObject response = client.basicAccurateGeneral(file.getBytes(), options);
+        long start = System.currentTimeMillis();
+        byte[] fileBytes = file.getBytes();
+        JSONObject response = client.basicAccurateGeneral(fileBytes, options);
+        long elapsed = System.currentTimeMillis() - start;
+        log.info("[OCR] 耗时={}ms, 文件大小={}bytes", elapsed, fileBytes.length);
+
         if (response.has("error_code")) {
             throw new IllegalStateException("Baidu OCR error: " + response.optString("error_msg"));
         }

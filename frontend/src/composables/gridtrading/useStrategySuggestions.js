@@ -26,7 +26,8 @@ export function useStrategySuggestions() {
       const results = await Promise.all(promises)
 
       results.forEach((res, index) => {
-        strategySuggestions.value[strategyIds[index]] = res.data || {
+        // axios 拦截器已解包，res 直接是数据
+        strategySuggestions.value[strategyIds[index]] = res || {
           buyCount: 0,
           sellCount: 0
         }

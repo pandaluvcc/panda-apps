@@ -34,8 +34,9 @@ export const useStrategyStore = defineStore('strategy', () => {
     loading.value = true
     try {
       const res = await getAllStrategies()
-      strategies.value = res.data || []
-      return res.data
+      // axios 拦截器已解包，res 直接是数据
+      strategies.value = res || []
+      return res
     } catch (error) {
       console.error('获取策略列表失败:', error)
       throw error

@@ -91,7 +91,7 @@ const handleUpdate = async () => {
     emit('success')
     handleClose()
   } catch (e) {
-    ElMessage.error('更新失败：' + (e.response?.data?.message || e.message))
+    ElMessage.error('更新失败：' + (e.message || e))
   } finally {
     updating.value = false
   }

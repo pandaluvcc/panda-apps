@@ -246,15 +246,16 @@ const loadStrategyDetail = async () => {
       getGridLines(strategyId.value),
       getTradeRecords(strategyId.value)
     ])
-    strategy.value = strategyRes.data
+    // axios 拦截器已解包，res 直接是数据
+    strategy.value = strategyRes
     // 后端返回 { strategy: {...}, gridPlans: [...] }，需要取 gridPlans
-    gridLines.value = gridRes.data.gridPlans || gridRes.data
-    tradeRecords.value = tradeRes.data
+    gridLines.value = gridRes.gridPlans || gridRes
+    tradeRecords.value = tradeRes
     priceInput.value = String(strategy.value.lastPrice || '')
     // 模拟风险数据
     risks.value = []
   } catch (e) {
-    ElMessage.error('加载失败：' + (e.response?.data?.message || e.message))
+    ElMessage.error('加载失败：' + (e.message || e))
   } finally {
     loading.value = false
   }
@@ -268,7 +269,7 @@ const onPriceChange = async () => {
       // 保存现价到后端，并使用返回值更新本地数据
       const res = await updateStrategyLastPrice(strategyId.value, price)
       // 更新本地策略数据，刷新头部面板
-      strategy.value = res.data
+      strategy.value = res
     } catch (e) {
       console.error('保存现价失败:', e)
     }
@@ -323,7 +324,7 @@ const doExecute = async (data) => {
     // 执行成功后重新加载数据
     await loadStrategyDetail()
   } catch (e) {
-    ElMessage.error('执行失败：' + (e.response?.data?.message || e.message))
+    ElMessage.error('执行失败：' + (e.message || e))
   } finally {
     executing.value = false
   }
@@ -345,7 +346,7 @@ const handleSaveFee = async (fee) => {
     feeDialogVisible.value = false
     loadStrategyDetail()
   } catch (e) {
-    ElMessage.error('保存失败：' + (e.response?.data?.message || e.message))
+    ElMessage.error('保存失败：' + (e.message || e))
   } finally {
     savingFee.value = false
   }
