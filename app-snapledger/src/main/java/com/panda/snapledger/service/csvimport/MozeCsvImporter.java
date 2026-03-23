@@ -9,6 +9,8 @@ import com.panda.snapledger.repository.RecordRepository;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -30,6 +32,9 @@ import java.util.Set;
 @Service
 public class MozeCsvImporter {
 
+    private static final Logger log = LoggerFactory.getLogger(MozeCsvImporter.class);
+    private static final int BATCH_SIZE = 500;
+
     private final RecordRepository recordRepository;
     private final CategoryRepository categoryRepository;
     private final AccountRepository accountRepository;
@@ -42,7 +47,6 @@ public class MozeCsvImporter {
         this.accountRepository = accountRepository;
     }
 
-    @Transactional
     public ImportResult importFromCsv(MultipartFile file) throws IOException {
         List<Record> records = new ArrayList<>();
         Set<String> accounts = new HashSet<>();
@@ -77,24 +81,70 @@ public class MozeCsvImporter {
             }
         }
 
+        log.info("CSV解析完成: {}条记录, {}个账户, {}个分类", records.size(), accounts.size(), categories.size());
+
+        // 批量保存账户和分类
+        saveAccountsBatch(accounts);
+        saveCategoriesBatch(categories);
+
+        // 分批保存记录
+        int savedCount = saveRecordsBatch(records);
+
+        return new ImportResult(savedCount, accounts.size(), categories.size());
+    }
+
+    @Transactional
+    public void saveAccountsBatch(Set<String> accounts) {
+        Set<String> existingNames = accountRepository.findAllNames();
+        List<Account> newAccounts = new ArrayList<>();
+
         for (String accountName : accounts) {
-            if (!accountRepository.existsByName(accountName)) {
+            if (!existingNames.contains(accountName)) {
                 Account account = new Account();
                 account.setName(accountName);
-                accountRepository.save(account);
+                newAccounts.add(account);
             }
         }
+
+        if (!newAccounts.isEmpty()) {
+            accountRepository.saveAll(newAccounts);
+            log.info("新增{}个账户", newAccounts.size());
+        }
+    }
+
+    @Transactional
+    public void saveCategoriesBatch(Set<Category> categories) {
+        Set<String> existingKeys = categoryRepository.findAllCategoryKeys();
+        List<Category> newCategories = new ArrayList<>();
 
         for (Category cat : categories) {
-            if (categoryRepository.findByMainCategoryAndSubCategoryAndType(
-                    cat.getMainCategory(), cat.getSubCategory(), cat.getType()) == null) {
-                categoryRepository.save(cat);
+            String key = cat.getMainCategory() + "|||" +
+                        (cat.getSubCategory() == null ? "" : cat.getSubCategory()) + "|||" +
+                        cat.getType();
+            if (!existingKeys.contains(key)) {
+                newCategories.add(cat);
             }
         }
 
-        recordRepository.saveAll(records);
+        if (!newCategories.isEmpty()) {
+            categoryRepository.saveAll(newCategories);
+            log.info("新增{}个分类", newCategories.size());
+        }
+    }
 
-        return new ImportResult(records.size(), accounts.size(), categories.size());
+    @Transactional
+    public int saveRecordsBatch(List<Record> records) {
+        int totalSaved = 0;
+
+        for (int i = 0; i < records.size(); i += BATCH_SIZE) {
+            int end = Math.min(i + BATCH_SIZE, records.size());
+            List<Record> batch = records.subList(i, end);
+            recordRepository.saveAll(batch);
+            totalSaved += batch.size();
+            log.info("保存记录进度: {}/{}", totalSaved, records.size());
+        }
+
+        return totalSaved;
     }
 
     private Record parseRecord(CSVRecord csvRecord) {
@@ -147,6 +197,7 @@ public class MozeCsvImporter {
 
             return record;
         } catch (Exception e) {
+            log.warn("解析记录失败: {}", e.getMessage());
             return null;
         }
     }
