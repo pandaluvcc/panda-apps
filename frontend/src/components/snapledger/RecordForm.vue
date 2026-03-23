@@ -1,13 +1,13 @@
 <template>
   <van-cell-group inset>
-    <van-field name="recordType" label="类型">
-      <template #input>
-        <van-radio-group v-model="form.recordType" direction="horizontal">
-          <van-radio name="支出">支出</van-radio>
-          <van-radio name="收入">收入</van-radio>
-        </van-radio-group>
-      </template>
-    </van-field>
+    <van-field
+      v-model="categoryDisplay"
+      is-link
+      readonly
+      label="分类"
+      placeholder="请选择分类"
+      @click="showCategoryPicker = true"
+    />
 
     <van-field
       v-model="form.amount"
@@ -15,15 +15,6 @@
       label="金额"
       placeholder="请输入金额"
       :rules="[{ required: true, message: '请输入金额' }]"
-    />
-
-    <van-field
-      v-model="form.mainCategory"
-      is-link
-      readonly
-      label="分类"
-      placeholder="请选择分类"
-      @click="showCategoryPicker = true"
     />
 
     <van-field
@@ -61,13 +52,11 @@
   </van-cell-group>
 
   <!-- 分类选择器 -->
-  <van-popup v-model:show="showCategoryPicker" position="bottom" round>
-    <van-picker
-      :columns="categoryColumns"
-      @confirm="onCategoryConfirm"
-      @cancel="showCategoryPicker = false"
-    />
-  </van-popup>
+  <CategoryPicker
+    v-model:show="showCategoryPicker"
+    v-model:recordType="form.recordType"
+    @select="onCategorySelect"
+  />
 
   <!-- 账户选择器 -->
   <van-popup v-model:show="showAccountPicker" position="bottom" round>
@@ -90,7 +79,8 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { getCategories, getAccounts } from '@/api'
+import { getAccounts } from '@/api'
+import CategoryPicker from './CategoryPicker.vue'
 
 const props = defineProps({
   modelValue: { type: Object, default: () => ({}) }
@@ -109,16 +99,21 @@ const form = ref({
   description: ''
 })
 
-const categories = ref([])
 const accounts = ref([])
 const showCategoryPicker = ref(false)
 const showAccountPicker = ref(false)
 const showDatePicker = ref(false)
 const selectedDate = ref(['2024', '01', '01'])
 
-const categoryColumns = computed(() => {
-  const mainCats = [...new Set(categories.value.map(c => c.mainCategory))]
-  return mainCats.map(cat => ({ text: cat, value: cat }))
+// 分类显示文本
+const categoryDisplay = computed(() => {
+  if (form.value.mainCategory && form.value.subCategory) {
+    return `${form.value.mainCategory} - ${form.value.subCategory}`
+  }
+  if (form.value.mainCategory) {
+    return form.value.mainCategory
+  }
+  return ''
 })
 
 const accountColumns = computed(() => {
@@ -131,21 +126,18 @@ watch(form, (val) => {
 
 onMounted(async () => {
   try {
-    const [catRes, accRes] = await Promise.all([
-      getCategories(),
-      getAccounts()
-    ])
-    // axios 拦截器已解包，res 直接是数据
-    categories.value = catRes || []
-    accounts.value = accRes || []
+    const res = await getAccounts()
+    accounts.value = res || []
   } catch (e) {
-    console.error('Failed to load categories/accounts:', e)
+    console.error('Failed to load accounts:', e)
   }
 })
 
-function onCategoryConfirm({ selectedOptions }) {
-  form.value.mainCategory = selectedOptions[0].text
-  showCategoryPicker.value = false
+// 分类选择回调
+function onCategorySelect(category) {
+  form.value.recordType = category.type
+  form.value.mainCategory = category.mainCategory
+  form.value.subCategory = category.subCategory
 }
 
 function onAccountConfirm({ selectedOptions }) {
