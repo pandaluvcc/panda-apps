@@ -66,17 +66,28 @@
 
 ### 前端改造
 
-**文件：** `frontend/src/components/snapledger/RecordForm.vue`
+**文件：** `frontend/src/components/snapledger/CategoryPicker.vue`（重构现有组件）
+
+**组件架构：**
+- 保持 `CategoryPicker.vue` 作为独立组件
+- `RecordForm.vue` 通过 `v-model:show` 和 `@select` 事件与该组件交互
+- 组件负责所有分类选择逻辑和状态管理
 
 **改造点：**
 1. 将 `van-picker` 替换为自定义弹窗布局
 2. 新增状态：
    - `categoryStep: 'main' | 'sub'` - 当前步骤
-   - `selectedMainCategory: string` - 选中的主类别
-   - `selectedRecordType: string` - 选中的记录类型
+   - `selectedMainCategory: { name: string, icon: string } | null` - 选中的主类别
+   - `selectedRecordTypeIndex: number` - 选中的记录类型索引
 3. 分类数据按 `type` 和 `mainCategory` 分组
 4. 主类别网格：每个主类别取其第一个子类别的图标作为主类别图标
 5. 返回按钮：使用选中主类别的图标
+
+**计算属性：**
+- `recordTypes`: 从分类数据提取唯一的 type 列表 ['支出', '收入', '转账', '应收账款']
+- `currentTypeCategories`: 当前选中类型的所有分类
+- `mainCategories`: 当前类型下的主类别列表（去重，每个带图标）
+- `subCategories`: 选中主类别下的子类别列表
 
 **组件结构：**
 ```vue
@@ -86,13 +97,24 @@
     <van-tab v-for="type in recordTypes" :title="type" />
   </van-tabs>
 
+  <!-- 加载状态 -->
+  <van-loading v-if="loading" class="loading-state" />
+
+  <!-- 错误状态 -->
+  <van-empty v-else-if="error" description="加载失败">
+    <van-button size="small" @click="loadCategories">重试</van-button>
+  </van-empty>
+
+  <!-- 空数据状态 -->
+  <van-empty v-else-if="mainCategories.length === 0" description="暂无分类" />
+
   <!-- 分类网格 -->
-  <van-grid :column-num="5">
+  <van-grid v-else :column-num="5">
     <!-- 主类别模式 -->
     <template v-if="categoryStep === 'main'">
       <van-grid-item
         v-for="cat in mainCategories"
-        :icon="cat.icon"
+        :icon="cat.icon || '📋'"
         :text="cat.name"
         @click="selectMainCategory(cat)"
       />
@@ -101,13 +123,13 @@
     <!-- 子类别模式 -->
     <template v-else>
       <van-grid-item
-        :icon="selectedMainCategory.icon"
+        :icon="selectedMainCategory.icon || '📋'"
         text="返回"
         @click="categoryStep = 'main'"
       />
       <van-grid-item
         v-for="sub in subCategories"
-        :icon="sub.icon"
+        :icon="sub.icon || '📋'"
         :text="sub.subCategory"
         @click="selectSubCategory(sub)"
       />
@@ -116,12 +138,69 @@
 </van-popup>
 ```
 
+**组件接口：**
+```typescript
+// Props
+defineProps({
+  show: { type: Boolean, default: false },
+  recordType: { type: String, default: '支出' }  // 初始记录类型
+})
+
+// Emits
+defineEmits([
+  'update:show',           // v-model:show 双向绑定
+  'update:recordType',     // v-model:recordType 双向绑定
+  'select'                 // 选择完成时触发
+])
+
+// select 事件 payload
+{
+  id: number,              // 分类 ID
+  type: string,            // 记录类型
+  mainCategory: string,    // 主类别
+  subCategory: string,     // 子类别
+  icon: string             // 图标
+}
+```
+
+**图标回退策略：**
+- 如果分类没有图标（icon 为 null 或空字符串），使用默认图标 `📋`
+- 主类别图标取第一个子类别的图标，如果子类别也没有图标则使用默认图标
+
+### RecordForm.vue 集成
+
+`RecordForm.vue` 需要做以下调整：
+
+1. 移除现有的 `van-picker` 分类选择器代码
+2. 引入重构后的 `CategoryPicker` 组件
+3. 使用 `v-model:recordType` 双向绑定记录类型：
+   ```vue
+   <CategoryPicker
+     v-model:show="showCategoryPicker"
+     v-model:recordType="form.recordType"
+     @select="onCategorySelect"
+   />
+   ```
+4. 处理 `@select` 事件，更新表单字段：
+   - `form.mainCategory` = 主类别名称
+   - `form.subCategory` = 子类别名称
+   - 显示文本 = "主类别 - 子类别"
+5. 移除顶部的记录类型单选按钮（由 CategoryPicker 的 Tab 替代）
+
 ### 后端 API
 
 现有 API 已满足需求，无需改动：
 - `GET /api/snapledger/categories` - 获取所有分类
 
 前端获取数据后按需分组即可。
+
+### 边界情况处理
+
+1. **无子类别的主类别**：如果某主类别没有子类别，点击后直接选中该主类别（subCategory 设为空或与 mainCategory 相同）
+2. **空分类列表**：显示"暂无分类"提示，引导用户去管理页面添加
+3. **网络错误**：显示加载失败提示，提供重试按钮
+4. **切换记录类型时**：自动重置 `categoryStep` 为 `'main'`，清空 `selectedMainCategory`
+5. **关闭弹窗时**：如果是子类别模式，重置为主类别模式，方便下次打开
 
 ### 预设分类数据
 
