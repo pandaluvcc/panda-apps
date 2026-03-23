@@ -45,6 +45,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { formatDateISO } from '@/utils/format'
 
 const props = defineProps({
   year: { type: Number, required: true },
@@ -113,9 +114,10 @@ const calendarDays = computed(() => {
     const date = new Date(props.year, props.month - 1, d)
     const dayOfWeek = date.getDay()
     const dayData = props.days.find(day => {
-      const dayDate = new Date(day.date)
-      return dayDate.getDate() === d
-    }) || { date: date.toISOString().split('T')[0], income: 0, expense: 0, recordCount: 0 }
+      // 后端返回的日期格式为 YYYY-MM-DD，直接比较日期部分
+      const dayNum = parseInt(day.date.split('-')[2], 10)
+      return dayNum === d
+    }) || { date: formatDateISO(date), income: 0, expense: 0, recordCount: 0 }
     result.push({ ...dayData, date, dayOfWeek })
   }
 

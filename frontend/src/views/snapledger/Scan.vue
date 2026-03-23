@@ -145,6 +145,7 @@ import { useRouter } from 'vue-router'
 import { recognizeImage, confirmOcr } from '@/api/snapledger/ocr'
 import { getCategories } from '@/api/snapledger/category'
 import { getAccounts } from '@/api/snapledger/account'
+import { formatDateISO } from '@/utils/format'
 import { showToast, showSuccessToast } from 'vant'
 
 const router = useRouter()
@@ -270,7 +271,7 @@ async function handleConfirm() {
       amount: parseFloat(form.amount),
       recordType: form.recordType,
       merchant: form.merchant,
-      date: form.date || new Date().toISOString().split('T')[0],
+      date: form.date || formatDateISO(new Date()),
       account: form.account,
       mainCategory: form.mainCategory,
       subCategory: form.subCategory,

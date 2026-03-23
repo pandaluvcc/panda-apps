@@ -80,6 +80,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { getAccounts } from '@/api'
+import { formatDateISO } from '@/utils/format'
 import CategoryPicker from './CategoryPicker.vue'
 
 const props = defineProps({
@@ -94,7 +95,7 @@ const form = ref({
   mainCategory: '',
   subCategory: '',
   account: '',
-  date: new Date().toISOString().split('T')[0],
+  date: formatDateISO(new Date()),
   name: '',
   description: ''
 })

@@ -52,6 +52,12 @@ public interface TradeRecordRepository extends JpaRepository<TradeRecord, Long> 
      */
     @Query("SELECT tr FROM TradeRecord tr JOIN FETCH tr.gridLine WHERE tr.strategy.id = :strategyId ORDER BY tr.tradeTime ASC")
     List<TradeRecord> findByStrategyIdWithGridLineOrderByTradeTimeAsc(@Param("strategyId") Long strategyId);
+
+    /**
+     * ✅ 优化：查询策略的所有交易记录（倒序），并JOIN FETCH关联的GridLine，避免LazyInitializationException
+     */
+    @Query("SELECT tr FROM TradeRecord tr JOIN FETCH tr.gridLine WHERE tr.strategy.id = :strategyId ORDER BY tr.tradeTime DESC")
+    List<TradeRecord> findByStrategyIdWithGridLineOrderByTradeTimeDesc(@Param("strategyId") Long strategyId);
     
     /**
      * 查询策略的所有交易记录按时间倒序

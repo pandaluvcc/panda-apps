@@ -2,6 +2,7 @@
   "permissions": {
     "defaultMode": "dontAsk",
     "allow": [
+      "Write",
 	  "Edit",
 	  "Bash",
       "Bash(npm install:*)",

@@ -14,4 +14,6 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
     List<Category> findByMainCategory(String mainCategory);
 
     Category findByMainCategoryAndSubCategory(String mainCategory, String subCategory);
+
+    Category findByMainCategoryAndSubCategoryAndType(String mainCategory, String subCategory, String type);
 }

@@ -26,6 +26,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { createRecord, updateRecord, deleteRecord } from '@/api'
+import { formatDateISO } from '@/utils/format'
 import RecordForm from '@/components/snapledger/RecordForm.vue'
 import SnapTabbar from '@/components/snapledger/SnapTabbar.vue'
 
@@ -41,7 +42,7 @@ const form = ref({
   mainCategory: '',
   subCategory: '',
   account: '',
-  date: new Date().toISOString().split('T')[0],
+  date: formatDateISO(new Date()),
   name: '',
   description: ''
 })

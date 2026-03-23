@@ -81,7 +81,7 @@ export const formatTime = (time, format = 'YYYY-MM-DD HH:mm:ss') => {
 }
 
 /**
- * 简化时间显示，今天的只显示时分，否则显示月日时分
+ * 格式化时间简化显示，今天的只显示时分，否则显示月日时分
  * @param {string|Date} time 时间
  * @returns {string} 简化后的时间
  */
@@ -98,4 +98,16 @@ export const formatTimeSimple = (time) => {
   } else {
     return formatTime(time, 'MM-DD HH:mm')
   }
+}
+
+/**
+ * 格式化日期为 YYYY-MM-DD（使用本地时区，避免时区偏移问题）
+ * @param {Date} date 日期对象
+ * @returns {string} 格式化后的日期字符串
+ */
+export const formatDateISO = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }

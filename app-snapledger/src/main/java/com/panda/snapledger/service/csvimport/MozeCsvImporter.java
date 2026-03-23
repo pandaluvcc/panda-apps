@@ -17,6 +17,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -47,11 +48,13 @@ public class MozeCsvImporter {
         Set<String> accounts = new HashSet<>();
         Set<Category> categories = new HashSet<>();
 
+        byte[] bytes = file.getBytes();
+        Charset charset = detectCharset(bytes);
+
         try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8));
+                new InputStreamReader(file.getInputStream(), charset));
              CSVParser csvParser = new CSVParser(reader, CSVFormat.DEFAULT
                      .withFirstRecordAsHeader()
-                     .withIgnoreHeaderCase()
                      .withTrim())) {
 
             for (CSVRecord csvRecord : csvParser) {
@@ -83,8 +86,8 @@ public class MozeCsvImporter {
         }
 
         for (Category cat : categories) {
-            if (categoryRepository.findByMainCategoryAndSubCategory(
-                    cat.getMainCategory(), cat.getSubCategory()) == null) {
+            if (categoryRepository.findByMainCategoryAndSubCategoryAndType(
+                    cat.getMainCategory(), cat.getSubCategory(), cat.getType()) == null) {
                 categoryRepository.save(cat);
             }
         }
@@ -127,6 +130,11 @@ public class MozeCsvImporter {
                 record.setDate(LocalDate.parse(dateStr, DateTimeFormatter.ofPattern("yyyy/M/d")));
             }
 
+            // amount 和 date 是必填字段，如果没有则跳过此记录
+            if (record.getAmount() == null || record.getDate() == null) {
+                return null;
+            }
+
             String timeStr = getValue(csvRecord, "时间");
             if (timeStr != null && !timeStr.isEmpty()) {
                 record.setTime(LocalTime.parse(timeStr));
@@ -154,6 +162,53 @@ public class MozeCsvImporter {
             }
         }
         return headers.length > 1 ? headers[headers.length - 1] : null;
+    }
+
+    /**
+     * 检测文件编码，优先尝试 UTF-8，失败则使用 GBK
+     */
+    private Charset detectCharset(byte[] bytes) {
+        // 先尝试 UTF-8
+        if (isValidUtf8(bytes)) {
+            return StandardCharsets.UTF_8;
+        }
+        // 默认使用 GBK（moze 导出的 CSV 常见编码）
+        return Charset.forName("GBK");
+    }
+
+    /**
+     * 简单验证是否为有效 UTF-8
+     */
+    private boolean isValidUtf8(byte[] bytes) {
+        int i = 0;
+        while (i < bytes.length) {
+            byte b = bytes[i];
+            if ((b & 0x80) == 0) {
+                // ASCII 字符
+                i++;
+            } else if ((b & 0xE0) == 0xC0) {
+                // 2字节 UTF-8
+                if (i + 1 >= bytes.length) return false;
+                if ((bytes[i + 1] & 0xC0) != 0x80) return false;
+                i += 2;
+            } else if ((b & 0xF0) == 0xE0) {
+                // 3字节 UTF-8
+                if (i + 2 >= bytes.length) return false;
+                if ((bytes[i + 1] & 0xC0) != 0x80) return false;
+                if ((bytes[i + 2] & 0xC0) != 0x80) return false;
+                i += 3;
+            } else if ((b & 0xF8) == 0xF0) {
+                // 4字节 UTF-8
+                if (i + 3 >= bytes.length) return false;
+                if ((bytes[i + 1] & 0xC0) != 0x80) return false;
+                if ((bytes[i + 2] & 0xC0) != 0x80) return false;
+                if ((bytes[i + 3] & 0xC0) != 0x80) return false;
+                i += 4;
+            } else {
+                return false;
+            }
+        }
+        return true;
     }
 
     public static class ImportResult {

@@ -37,9 +37,9 @@ public class TradeRecordController {
     @GetMapping("/strategies/{id}/trades")
     @Operation(summary = "获取策略成交记录")
     public List<TradeRecordDto> getStrategyTrades(@PathVariable Long id) {
-        Strategy strategy = strategyRepository.findById(id)
+        strategyRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("策略不存在"));
-        return tradeRecordRepository.findByStrategyOrderByTradeTimeDesc(strategy).stream()
+        return tradeRecordRepository.findByStrategyIdWithGridLineOrderByTradeTimeDesc(id).stream()
                 .map(TradeRecordDto::fromEntity)
                 .collect(Collectors.toList());
     }

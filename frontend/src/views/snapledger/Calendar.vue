@@ -46,6 +46,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getMonthCalendar, getRecordsByDate } from '@/api'
+import { formatDateISO } from '@/utils/format'
 import CalendarGrid from '@/components/snapledger/CalendarGrid.vue'
 import RecordList from '@/components/snapledger/RecordList.vue'
 import SnapTabbar from '@/components/snapledger/SnapTabbar.vue'
@@ -80,7 +81,8 @@ async function loadMonthData() {
 
 async function loadDayRecords() {
   try {
-    const dateStr = selectedDate.value.toISOString().split('T')[0]
+    // 使用本地日期格式化，避免时区偏移问题
+    const dateStr = formatDateISO(selectedDate.value)
     const res = await getRecordsByDate(dateStr)
     // axios 拦截器已解包，res 直接是数据
     dayRecords.value = res || []
