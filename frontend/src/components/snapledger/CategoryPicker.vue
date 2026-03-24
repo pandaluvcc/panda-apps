@@ -76,7 +76,7 @@ const selectedMainCategory = ref(null)
 const activeTabIndex = ref(0)
 
 // 记录类型列表（固定顺序）
-const recordTypes = ['支出', '收入', '转账', '应收账款']
+const recordTypes = ['建议', '支出', '收入', '转账', '应收款项', '应付款项']
 
 // 当前类型下的所有分类
 const currentTypeCategories = computed(() => {
