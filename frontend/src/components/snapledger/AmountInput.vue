@@ -65,9 +65,13 @@ function stopTimer() {
   gap: 12px;
   padding: 16px;
   background: #FFFFFF;
+  box-sizing: border-box;
+  width: 100%;
+  overflow: hidden;
 }
 
 .currency-badge {
+  flex-shrink: 0;
   padding: 8px;
   background: #F5F5F5;
   border-radius: 4px;
@@ -77,14 +81,16 @@ function stopTimer() {
 
 .amount-field {
   flex: 1;
-  font-size: 32px;
+  min-width: 0;
+  font-size: 28px;
   font-weight: 600;
   color: #000000;
   background: #F5F5F5;
   border: none;
   border-radius: 4px;
-  padding: 8px 16px;
+  padding: 8px 12px;
   text-align: right;
+  box-sizing: border-box;
 }
 
 .amount-field::placeholder {
@@ -92,6 +98,7 @@ function stopTimer() {
 }
 
 .amount-buttons {
+  flex-shrink: 0;
   display: flex;
   gap: 8px;
 }

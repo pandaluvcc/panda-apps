@@ -52,18 +52,9 @@
           />
         </div>
         <div class="form-field">
-          <label class="field-label">日期</label>
-          <div class="field-input field-select" @click="showDatePicker = true">
-            {{ form.date }}
-          </div>
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-field">
-          <label class="field-label">时间</label>
-          <div class="field-input field-select" @click="showTimePicker = true">
-            {{ form.time || '请选择' }}
+          <label class="field-label">日期时间</label>
+          <div class="field-input field-select" @click="showDateTimePicker = true">
+            {{ displayDateTime }}
           </div>
         </div>
       </div>
@@ -105,23 +96,11 @@
       />
     </van-popup>
 
-    <!-- 日期选择器 -->
-    <van-popup v-model:show="showDatePicker" position="bottom" round>
-      <van-date-picker
-        v-model="selectedDate"
-        @confirm="onDateConfirm"
-        @cancel="showDatePicker = false"
-      />
-    </van-popup>
-
-    <!-- 时间选择器 -->
-    <van-popup v-model:show="showTimePicker" position="bottom" round>
-      <van-time-picker
-        v-model="selectedTime"
-        @confirm="onTimeConfirm"
-        @cancel="showTimePicker = false"
-      />
-    </van-popup>
+    <!-- 日期时间选择器 -->
+    <DateTimePicker
+      v-model:show="showDateTimePicker"
+      v-model="dateTimeValue"
+    />
 
     <!-- 标签选择器 -->
     <TagPicker
@@ -137,6 +116,7 @@ import { getAccounts } from '@/api'
 import { formatDateISO } from '@/utils/format'
 import AmountInput from './AmountInput.vue'
 import TagPicker from './TagPicker.vue'
+import DateTimePicker from './DateTimePicker.vue'
 
 const props = defineProps({
   modelValue: { type: Object, default: () => ({}) }
@@ -162,26 +142,32 @@ const form = ref({
 
 const accounts = ref([])
 const showAccountPicker = ref(false)
-const showDatePicker = ref(false)
-const showTimePicker = ref(false)
+const showDateTimePicker = ref(false)
 const showTagPicker = ref(false)
 
-// 根据 form.date 初始化日期选择器
-const selectedDate = computed({
-  get: () => {
-    const parts = form.value.date?.split('-') || []
-    return parts.length === 3 ? parts : [String(new Date().getFullYear()), '01', '01']
-  },
-  set: (val) => { /* 由 onDateConfirm 处理 */ }
+// 日期时间显示值
+const displayDateTime = computed(() => {
+  if (form.value.date) {
+    return form.value.time ? `${form.value.date} ${form.value.time}` : form.value.date
+  }
+  return '请选择'
 })
 
-// 根据 form.time 初始化时间选择器
-const selectedTime = computed({
+// 日期时间选择器的值
+const dateTimeValue = computed({
   get: () => {
-    const parts = form.value.time?.split(':') || []
-    return parts.length >= 2 ? [parts[0], parts[1]] : ['00', '00']
+    if (form.value.date) {
+      return form.value.time ? `${form.value.date} ${form.value.time}` : `${form.value.date} 00:00:00`
+    }
+    return ''
   },
-  set: (val) => { /* 由 onTimeConfirm 处理 */ }
+  set: (val) => {
+    if (val) {
+      const [date, time] = val.split(' ')
+      form.value.date = date
+      form.value.time = time || ''
+    }
+  }
 })
 
 const accountColumns = computed(() => {
@@ -192,12 +178,17 @@ watch(form, (val) => {
   emit('update:modelValue', val)
 }, { deep: true })
 
-// 同步外部值
-watch(() => props.modelValue, (val) => {
+// 同步外部值，避免循环更新
+watch(() => props.modelValue, (val, oldVal) => {
   if (val) {
-    form.value = { ...form.value, ...val }
+    // 检查值是否真的变化了，避免不必要的更新
+    const hasChanged = !oldVal ||
+      Object.keys(val).some(key => val[key] !== oldVal[key])
+    if (hasChanged) {
+      form.value = { ...form.value, ...val }
+    }
   }
-}, { immediate: true, deep: true })
+}, { immediate: true })
 
 onMounted(async () => {
   try {
@@ -211,16 +202,6 @@ onMounted(async () => {
 function onAccountConfirm({ selectedOptions }) {
   form.value.account = selectedOptions[0].text
   showAccountPicker.value = false
-}
-
-function onDateConfirm({ selectedValues }) {
-  form.value.date = selectedValues.join('-')
-  showDatePicker.value = false
-}
-
-function onTimeConfirm({ selectedValues }) {
-  form.value.time = `${selectedValues[0]}:${selectedValues[1]}`
-  showTimePicker.value = false
 }
 </script>
 
