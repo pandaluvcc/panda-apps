@@ -1,87 +1,142 @@
 <template>
-  <van-cell-group inset>
-    <van-field
-      v-model="categoryDisplay"
-      is-link
-      readonly
-      label="分类"
-      placeholder="请选择分类"
-      @click="showCategoryPicker = true"
-    />
+  <div class="record-form">
+    <!-- 金额输入区域 -->
+    <AmountInput v-model="form.amount" />
 
-    <van-field
-      v-model="form.amount"
-      type="number"
-      label="金额"
-      placeholder="请输入金额"
-      :rules="[{ required: true, message: '请输入金额' }]"
-    />
+    <!-- 详细信息区域 -->
+    <div class="detail-section">
+      <div class="form-row">
+        <div class="form-field">
+          <label class="field-label">名称</label>
+          <input
+            v-model="form.name"
+            class="field-input"
+            placeholder="可选"
+          />
+        </div>
+        <div class="form-field">
+          <label class="field-label">账户</label>
+          <div class="field-input field-select" @click="showAccountPicker = true">
+            {{ form.account || '请选择' }}
+          </div>
+        </div>
+      </div>
 
-    <van-field
-      v-model="form.account"
-      is-link
-      readonly
-      label="账户"
-      placeholder="请选择账户"
-      @click="showAccountPicker = true"
-    />
+      <div class="form-row">
+        <div class="form-field">
+          <label class="field-label">项目</label>
+          <input
+            v-model="form.project"
+            class="field-input"
+            placeholder="可选"
+          />
+        </div>
+        <div class="form-field">
+          <label class="field-label">商家</label>
+          <input
+            v-model="form.merchant"
+            class="field-input"
+            placeholder="可选"
+          />
+        </div>
+      </div>
 
-    <van-field
-      v-model="form.date"
-      is-link
-      readonly
-      label="日期"
-      placeholder="请选择日期"
-      @click="showDatePicker = true"
-    />
+      <div class="form-row">
+        <div class="form-field">
+          <label class="field-label">次数</label>
+          <input
+            v-model.number="form.count"
+            type="number"
+            class="field-input"
+            placeholder="可选"
+          />
+        </div>
+        <div class="form-field">
+          <label class="field-label">日期</label>
+          <div class="field-input field-select" @click="showDatePicker = true">
+            {{ form.date }}
+          </div>
+        </div>
+      </div>
 
-    <van-field
-      v-model="form.name"
-      label="名称"
-      placeholder="可选"
-    />
+      <div class="form-row">
+        <div class="form-field">
+          <label class="field-label">时间</label>
+          <div class="field-input field-select" @click="showTimePicker = true">
+            {{ form.time || '请选择' }}
+          </div>
+        </div>
+      </div>
+    </div>
 
-    <van-field
-      v-model="form.description"
-      rows="2"
-      autosize
-      label="备注"
-      type="textarea"
-      placeholder="可选"
-    />
-  </van-cell-group>
+    <!-- 标签显示区域 -->
+    <div class="tag-section" @click="showTagPicker = true">
+      <template v-if="form.tags && form.tags.length > 0">
+        <van-tag
+          v-for="tag in form.tags"
+          :key="tag"
+          type="primary"
+          size="medium"
+          class="tag-chip"
+        >
+          #{{ tag }}
+        </van-tag>
+      </template>
+      <span v-else class="tag-placeholder">#标签</span>
+    </div>
 
-  <!-- 分类选择器 -->
-  <CategoryPicker
-    v-model:show="showCategoryPicker"
-    v-model:recordType="form.recordType"
-    @select="onCategorySelect"
-  />
+    <!-- 备注输入区域 -->
+    <div class="remark-section">
+      <label class="field-label">备注</label>
+      <textarea
+        v-model="form.description"
+        class="remark-input"
+        placeholder="备注"
+        rows="2"
+      ></textarea>
+    </div>
 
-  <!-- 账户选择器 -->
-  <van-popup v-model:show="showAccountPicker" position="bottom" round>
-    <van-picker
-      :columns="accountColumns"
-      @confirm="onAccountConfirm"
-      @cancel="showAccountPicker = false"
-    />
-  </van-popup>
+    <!-- 账户选择器 -->
+    <van-popup v-model:show="showAccountPicker" position="bottom" round>
+      <van-picker
+        :columns="accountColumns"
+        @confirm="onAccountConfirm"
+        @cancel="showAccountPicker = false"
+      />
+    </van-popup>
 
-  <!-- 日期选择器 -->
-  <van-popup v-model:show="showDatePicker" position="bottom" round>
-    <van-date-picker
-      v-model="selectedDate"
-      @confirm="onDateConfirm"
-      @cancel="showDatePicker = false"
+    <!-- 日期选择器 -->
+    <van-popup v-model:show="showDatePicker" position="bottom" round>
+      <van-date-picker
+        v-model="selectedDate"
+        @confirm="onDateConfirm"
+        @cancel="showDatePicker = false"
+      />
+    </van-popup>
+
+    <!-- 时间选择器 -->
+    <van-popup v-model:show="showTimePicker" position="bottom" round>
+      <van-time-picker
+        v-model="selectedTime"
+        @confirm="onTimeConfirm"
+        @cancel="showTimePicker = false"
+      />
+    </van-popup>
+
+    <!-- 标签选择器 -->
+    <TagPicker
+      v-model:show="showTagPicker"
+      v-model="form.tags"
     />
-  </van-popup>
+  </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { getAccounts } from '@/api'
 import { formatDateISO } from '@/utils/format'
-import CategoryPicker from './CategoryPicker.vue'
+import AmountInput from './AmountInput.vue'
+import TagPicker from './TagPicker.vue'
 
 const props = defineProps({
   modelValue: { type: Object, default: () => ({}) }
@@ -96,25 +151,37 @@ const form = ref({
   subCategory: '',
   account: '',
   date: formatDateISO(new Date()),
+  time: '',
   name: '',
+  project: '',
+  merchant: '',
+  count: null,
+  tags: [],
   description: ''
 })
 
 const accounts = ref([])
-const showCategoryPicker = ref(false)
 const showAccountPicker = ref(false)
 const showDatePicker = ref(false)
-const selectedDate = ref(['2024', '01', '01'])
+const showTimePicker = ref(false)
+const showTagPicker = ref(false)
 
-// 分类显示文本
-const categoryDisplay = computed(() => {
-  if (form.value.mainCategory && form.value.subCategory) {
-    return `${form.value.mainCategory} - ${form.value.subCategory}`
-  }
-  if (form.value.mainCategory) {
-    return form.value.mainCategory
-  }
-  return ''
+// 根据 form.date 初始化日期选择器
+const selectedDate = computed({
+  get: () => {
+    const parts = form.value.date?.split('-') || []
+    return parts.length === 3 ? parts : [String(new Date().getFullYear()), '01', '01']
+  },
+  set: (val) => { /* 由 onDateConfirm 处理 */ }
+})
+
+// 根据 form.time 初始化时间选择器
+const selectedTime = computed({
+  get: () => {
+    const parts = form.value.time?.split(':') || []
+    return parts.length >= 2 ? [parts[0], parts[1]] : ['00', '00']
+  },
+  set: (val) => { /* 由 onTimeConfirm 处理 */ }
 })
 
 const accountColumns = computed(() => {
@@ -125,6 +192,13 @@ watch(form, (val) => {
   emit('update:modelValue', val)
 }, { deep: true })
 
+// 同步外部值
+watch(() => props.modelValue, (val) => {
+  if (val) {
+    form.value = { ...form.value, ...val }
+  }
+}, { immediate: true, deep: true })
+
 onMounted(async () => {
   try {
     const res = await getAccounts()
@@ -133,13 +207,6 @@ onMounted(async () => {
     console.error('Failed to load accounts:', e)
   }
 })
-
-// 分类选择回调
-function onCategorySelect(category) {
-  form.value.recordType = category.type
-  form.value.mainCategory = category.mainCategory
-  form.value.subCategory = category.subCategory
-}
 
 function onAccountConfirm({ selectedOptions }) {
   form.value.account = selectedOptions[0].text
@@ -150,4 +217,96 @@ function onDateConfirm({ selectedValues }) {
   form.value.date = selectedValues.join('-')
   showDatePicker.value = false
 }
+
+function onTimeConfirm({ selectedValues }) {
+  form.value.time = `${selectedValues[0]}:${selectedValues[1]}`
+  showTimePicker.value = false
+}
 </script>
+
+<style scoped>
+.record-form {
+  background: #F7F8FA;
+}
+
+.detail-section {
+  background: #FFFFFF;
+  padding: 16px;
+  margin-top: 8px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.form-row:last-child {
+  margin-bottom: 0;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-label {
+  font-size: 14px;
+  color: #666666;
+}
+
+.field-input {
+  font-size: 14px;
+  color: #333333;
+  background: #F5F5F5;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+}
+
+.field-select {
+  cursor: pointer;
+}
+
+.tag-section {
+  background: #FFFFFF;
+  padding: 16px;
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.tag-placeholder {
+  font-size: 14px;
+  color: #1890FF;
+}
+
+.tag-chip {
+  cursor: pointer;
+}
+
+.remark-section {
+  background: #FFFFFF;
+  padding: 16px;
+  margin-top: 8px;
+  border-radius: 8px;
+  min-height: 80px;
+}
+
+.remark-input {
+  width: 100%;
+  margin-top: 8px;
+  font-size: 14px;
+  color: #333333;
+  background: #F5F5F5;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  resize: none;
+  box-sizing: border-box;
+}
+</style>
