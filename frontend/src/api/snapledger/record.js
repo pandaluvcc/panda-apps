@@ -12,6 +12,10 @@ export function getRecordsByMonth(year, month) {
   return api.get(`/snapledger/records/month/${year}/${month}`)
 }
 
+export function getRecordById(id) {
+  return api.get(`/snapledger/records/${id}`)
+}
+
 export function createRecord(data) {
   return api.post('/snapledger/records', data)
 }

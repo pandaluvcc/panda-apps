@@ -59,6 +59,9 @@ public class Record {
     @Column(name = "project", length = 50)
     private String project;
 
+    @Column(name = "count")
+    private Integer count;
+
     @Column(name = "description", length = 500)
     private String description;
 

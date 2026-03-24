@@ -42,6 +42,12 @@ public class RecordController {
         return recordService.findByYearMonth(year, month);
     }
 
+    @GetMapping("/{id}")
+    @Operation(summary = "根据ID获取记账记录")
+    public RecordDTO getById(@PathVariable Long id) {
+        return recordService.findById(id);
+    }
+
     @PostMapping
     @Operation(summary = "创建记账记录")
     public RecordDTO create(@RequestBody RecordDTO dto) {

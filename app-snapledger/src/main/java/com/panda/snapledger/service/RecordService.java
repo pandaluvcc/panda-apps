@@ -35,6 +35,12 @@ public class RecordService {
                 .collect(Collectors.toList());
     }
 
+    public RecordDTO findById(Long id) {
+        Record record = recordRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("记录不存在: " + id));
+        return RecordDTO.fromEntity(record);
+    }
+
     public Page<RecordDTO> findAll(int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("date").descending().and(Sort.by("time").descending()));
         return recordRepository.findAll(pageable).map(RecordDTO::fromEntity);
@@ -67,6 +73,7 @@ public class RecordService {
         record.setDate(dto.getDate());
         record.setTime(dto.getTime());
         record.setProject(dto.getProject());
+        record.setCount(dto.getCount());
         record.setDescription(dto.getDescription());
         record.setTags(dto.getTags());
         record.setTarget(dto.getTarget());

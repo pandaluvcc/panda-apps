@@ -27,6 +27,7 @@ public class RecordDTO {
     private LocalDate date;
     private LocalTime time;
     private String project;
+    private Integer count;
     private String description;
     private String tags;
     private String target;
@@ -47,6 +48,7 @@ public class RecordDTO {
         dto.setDate(record.getDate());
         dto.setTime(record.getTime());
         dto.setProject(record.getProject());
+        dto.setCount(record.getCount());
         dto.setDescription(record.getDescription());
         dto.setTags(record.getTags());
         dto.setTarget(record.getTarget());
@@ -69,6 +71,7 @@ public class RecordDTO {
         record.setDate(this.date);
         record.setTime(this.time);
         record.setProject(this.project);
+        record.setCount(this.count);
         record.setDescription(this.description);
         record.setTags(this.tags);
         record.setTarget(this.target);
