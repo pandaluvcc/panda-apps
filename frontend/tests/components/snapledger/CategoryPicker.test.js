@@ -144,7 +144,8 @@ describe('CategoryPicker', () => {
       expect(wrapper.vm.categories.length).toBe(4)
     })
 
-    expect(wrapper.vm.activeTabIndex).toBe(1) // "收入" is at index 1
+    // "收入" is at index 2 in ['建议', '支出', '收入', '转账', '应收款项', '应付款项']
+    expect(wrapper.vm.activeTabIndex).toBe(2)
   })
 
   it('should emit update:recordType when tab changes', async () => {
@@ -154,7 +155,8 @@ describe('CategoryPicker', () => {
       expect(wrapper.vm.categories.length).toBe(4)
     })
 
-    wrapper.vm.activeTabIndex = 1
+    // Change to "收入" tab (index 2)
+    wrapper.vm.activeTabIndex = 2
     wrapper.vm.onTabChange()
     await nextTick()
 
@@ -162,14 +164,14 @@ describe('CategoryPicker', () => {
     expect(wrapper.emitted('update:recordType')[0][0]).toBe('收入')
   })
 
-  it('should show all four record types in tabs', async () => {
+  it('should show all six record types in tabs', async () => {
     const wrapper = await mountWithShow()
 
     await vi.waitFor(() => {
       expect(wrapper.vm.categories.length).toBe(4)
     })
 
-    expect(wrapper.vm.recordTypes).toEqual(['支出', '收入', '转账', '应收账款'])
+    expect(wrapper.vm.recordTypes).toEqual(['建议', '支出', '收入', '转账', '应收款项', '应付款项'])
   })
 
   it('should deduplicate main categories', async () => {

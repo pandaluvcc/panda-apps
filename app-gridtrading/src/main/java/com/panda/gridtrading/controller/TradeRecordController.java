@@ -51,7 +51,7 @@ public class TradeRecordController {
     @PutMapping("/trades/{id}/fee")
     @Operation(summary = "更新成交记录手续费")
     public TradeRecordDto updateTradeFee(@PathVariable Long id, @RequestBody Map<String, Object> request) {
-        TradeRecord record = tradeRecordRepository.findById(id)
+        TradeRecord record = tradeRecordRepository.findByIdWithGridLine(id)
                 .orElseThrow(() -> new IllegalArgumentException("成交记录不存在"));
 
         // 更新手续费
@@ -81,8 +81,8 @@ public class TradeRecordController {
             }
         }
 
-        TradeRecord saved = tradeRecordRepository.save(record);
-        return TradeRecordDto.fromEntity(saved);
+        tradeRecordRepository.save(record);
+        return TradeRecordDto.fromEntity(record);
     }
 
     /**

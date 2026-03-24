@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 交易记录 Repository
@@ -68,4 +69,10 @@ public interface TradeRecordRepository extends JpaRepository<TradeRecord, Long> 
      * 删除策略的所有交易记录
      */
     void deleteByStrategyId(Long strategyId);
+
+    /**
+     * 通过ID查询交易记录，并JOIN FETCH关联的GridLine，避免LazyInitializationException
+     */
+    @Query("SELECT tr FROM TradeRecord tr JOIN FETCH tr.gridLine WHERE tr.id = :id")
+    Optional<TradeRecord> findByIdWithGridLine(@Param("id") Long id);
 }
