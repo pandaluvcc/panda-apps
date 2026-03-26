@@ -32,6 +32,7 @@ on:
 env:
   BACKEND_DEPLOY_PATH: /data/docker/platform/panda-apps
   FRONTEND_DEPLOY_PATH: /data/docker/openresty/nginx/content/panda-apps
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-and-deploy:
@@ -98,12 +99,13 @@ jobs:
         run: |
           # 使用 rsync 增量同步 lib 目录
           # --ignore-existing: 跳过服务器上已存在的文件
+          # --size-only: 只比较文件大小，加快检查速度
           if [ "${{ inputs.upload_lib }}" = "true" ]; then
             echo "强制上传整个 lib 目录..."
             rsync -avz --delete panda-api/target/lib/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ env.BACKEND_DEPLOY_PATH }}/lib/
           else
             echo "增量同步 lib 目录（跳过已存在的文件）..."
-            rsync -avz --ignore-existing panda-api/target/lib/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ env.BACKEND_DEPLOY_PATH }}/lib/
+            rsync -avz --ignore-existing --size-only panda-api/target/lib/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ env.BACKEND_DEPLOY_PATH }}/lib/
           fi
 
       - name: Deploy backend on server
