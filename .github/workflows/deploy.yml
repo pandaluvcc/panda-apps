@@ -62,7 +62,7 @@ jobs:
         if: ${{ github.event_name == 'push' || inputs.deploy_frontend }}
         run: |
           cd frontend
-          npm ci
+          npm install
 
       - name: Build frontend
         if: ${{ github.event_name == 'push' || inputs.deploy_frontend }}
