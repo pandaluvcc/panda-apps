@@ -48,3 +48,7 @@ logs/
 *.tmp
 *.temp
 *.bak
+
+# AI deploy config (contains sensitive info)
+deploy/ai/config.sh
+deploy/ai/config.yml

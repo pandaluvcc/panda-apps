@@ -1,0 +1,36 @@
+#!/bin/bash
+# AI 自动化部署配置示例
+# 复制此文件为 config.sh 并填写实际值
+
+# ==================== 服务器配置 ====================
+SERVER_HOST="your-server-ip"
+SERVER_PORT="22"
+SERVER_USER="your-username"
+SSH_KEY="~/.ssh/id_ed25519"
+
+# ==================== 部署路径 ====================
+# 后端部署路径
+BACKEND_DEPLOY_PATH="/data/docker/platform/panda-apps"
+BACKEND_SERVICE_NAME="panda-apps"
+
+# 前端部署路径
+FRONTEND_DEPLOY_PATH="/data/docker/openresty/nginx/content/panda-apps"
+FRONTEND_RESTART_WEB="false"
+FRONTEND_WEB_CONTAINER="openresty"
+
+# ==================== 构建配置 ====================
+# 后端
+BACKEND_ENABLED="true"
+BACKEND_COMMAND="mvn clean package -DskipTests"
+
+# 前端
+FRONTEND_ENABLED="true"
+FRONTEND_DIR="frontend"
+FRONTEND_COMMAND="npm run build"
+FRONTEND_OUTPUT="dist"
+
+# ==================== 部署配置 ====================
+HEALTH_CHECK="true"
+BACKEND_HEALTH_URL="http://localhost:9090/actuator/health"
+HEALTH_TIMEOUT="60"
+LOG_LINES="50"

@@ -1,0 +1,72 @@
+# AI 自动化部署配置
+# 此文件包含敏感信息，已加入 .gitignore，请勿提交到版本控制
+
+servers:
+  # 生产服务器配置
+  production:
+    # 服务器 IP 或域名
+    host: "your-server-ip"
+
+    # SSH 端口，默认 22
+    port: 22
+
+    # SSH 用户名
+    user: "your-username"
+
+    # 认证方式：选择其中一种
+
+    # 方式一：SSH 密钥认证（推荐）
+    # 密钥文件路径（相对于 ~/.ssh/ 目录，或绝对路径）
+    # ssh_key: "~/.ssh/id_rsa"
+
+    # 方式二：密码认证
+    # password: "your-password"
+
+# 部署路径配置
+paths:
+  # 后端部署路径（Docker Compose 项目目录）
+  backend:
+    deploy_path: "/data/docker/platform/panda-apps"
+    # Docker Compose 服务名称
+    service_name: "panda-apps"
+
+  # 前端部署路径（静态文件目录，由 OpenResty/Nginx 提供服务）
+  frontend:
+    deploy_path: "/data/docker/openresty/nginx/content"
+    # 是否需要重启 Web 服务器
+    restart_web: false
+    # Web 服务器容器名称（如果需要重启）
+    web_container: "openresty"
+
+# 构建配置
+build:
+  # 后端构建配置
+  backend:
+    # 是否构建后端
+    enabled: true
+    # Maven 命令
+    command: "mvn clean package -DskipTests"
+    # 构建产物路径（相对于项目根目录）
+    output: "panda-api/target/*.jar"
+
+  # 前端构建配置
+  frontend:
+    # 是否构建前端
+    enabled: true
+    # 前端目录
+    directory: "frontend"
+    # 构建命令
+    command: "npm run build"
+    # 构建产物路径（相对于前端目录）
+    output: "dist"
+
+# 部署配置
+deploy:
+  # 部署后是否检查健康状态
+  health_check: true
+  # 后端健康检查 URL
+  backend_health_url: "http://localhost:9090/actuator/health"
+  # 健康检查超时时间（秒）
+  health_timeout: 60
+  # 部署后显示日志行数
+  log_lines: 50

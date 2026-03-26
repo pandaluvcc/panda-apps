@@ -1,0 +1,200 @@
+name: Deploy to Server
+
+on:
+  # 标签触发：推送 v* 标签时自动部署
+  push:
+    tags:
+      - 'v*'
+
+  # 手动触发：在 GitHub Actions 页面点击运行
+  workflow_dispatch:
+    inputs:
+      deploy_backend:
+        description: '部署后端'
+        required: true
+        default: true
+        type: boolean
+      deploy_frontend:
+        description: '部署前端'
+        required: true
+        default: true
+        type: boolean
+      version:
+        description: '版本号（可选）'
+        required: false
+        type: string
+
+env:
+  BACKEND_DEPLOY_PATH: /data/docker/platform/panda-apps
+  FRONTEND_DEPLOY_PATH: /data/docker/openresty/nginx/content/panda-apps
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ==================== 构建后端 ====================
+      - name: Set up JDK 17
+        if: ${{ github.event_name == 'push' || inputs.deploy_backend }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build backend with Maven
+        if: ${{ github.event_name == 'push' || inputs.deploy_backend }}
+        run: mvn clean package -DskipTests
+
+      # ==================== 构建前端 ====================
+      - name: Setup Node.js
+        if: ${{ github.event_name == 'push' || inputs.deploy_frontend }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        if: ${{ github.event_name == 'push' || inputs.deploy_frontend }}
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Build frontend
+        if: ${{ github.event_name == 'push' || inputs.deploy_frontend }}
+        run: |
+          cd frontend
+          npm run build
+
+      # ==================== 部署后端 ====================
+      - name: Upload backend JAR to server
+        if: ${{ github.event_name == 'push' || inputs.deploy_backend }}
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "panda-api/target/*.jar"
+          target: ${{ env.BACKEND_DEPLOY_PATH }}
+          strip_components: 2
+
+      - name: Upload lib directory to server
+        if: ${{ github.event_name == 'push' || inputs.deploy_backend }}
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "panda-api/target/lib/*"
+          target: ${{ env.BACKEND_DEPLOY_PATH }}
+          strip_components: 3
+
+      - name: Deploy backend on server
+        if: ${{ github.event_name == 'push' || inputs.deploy_backend }}
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ${{ env.BACKEND_DEPLOY_PATH }}
+
+            # 备份旧 JAR 包
+            if [ -f panda-api-1.0.0-SNAPSHOT.jar ]; then
+              mv panda-api-1.0.0-SNAPSHOT.jar panda-api-1.0.0-SNAPSHOT.jar-back$(date +%Y%m%d%H%M%S)
+            fi
+
+            # 移动上传的 JAR 包（scp 会保留目录结构）
+            if [ -f target/panda-api-1.0.0-SNAPSHOT.jar ]; then
+              mv target/panda-api-1.0.0-SNAPSHOT.jar .
+            fi
+
+            # 执行部署脚本
+            chmod +x deploy.sh
+            ./deploy.sh restart
+
+            echo "后端部署完成"
+
+      # ==================== 部署前端 ====================
+      - name: Package frontend
+        if: ${{ github.event_name == 'push' || inputs.deploy_frontend }}
+        run: |
+          cd frontend
+          tar -czf ../frontend-dist.tar.gz -C dist .
+
+      - name: Upload frontend to server
+        if: ${{ github.event_name == 'push' || inputs.deploy_frontend }}
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "frontend-dist.tar.gz"
+          target: /tmp
+
+      - name: Deploy frontend on server
+        if: ${{ github.event_name == 'push' || inputs.deploy_frontend }}
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # 备份旧文件
+            if [ -d "${{ env.FRONTEND_DEPLOY_PATH }}" ] && [ "$(ls -A ${{ env.FRONTEND_DEPLOY_PATH }} 2>/dev/null)" ]; then
+              mv ${{ env.FRONTEND_DEPLOY_PATH }} ${{ env.FRONTEND_DEPLOY_PATH }}_backup_$(date +%Y%m%d%H%M%S)
+            fi
+
+            # 创建目录并解压
+            mkdir -p ${{ env.FRONTEND_DEPLOY_PATH }}
+            cd ${{ env.FRONTEND_DEPLOY_PATH }}
+            tar -xzf /tmp/frontend-dist.tar.gz
+            rm /tmp/frontend-dist.tar.gz
+
+            echo "前端部署完成"
+
+      # ==================== 健康检查 ====================
+      - name: Health check
+        if: ${{ github.event_name == 'push' || inputs.deploy_backend }}
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "等待服务启动..."
+            sleep 10
+
+            # 检查容器状态
+            docker ps --filter "name=panda-apps" --format "table {{.Names}}\t{{.Status}}"
+
+            # 显示最近日志
+            cd ${{ env.BACKEND_DEPLOY_PATH }}
+            docker compose logs --tail=20 panda-apps
+
+      # ==================== 上传构建产物（可选） ====================
+      - name: Upload backend artifact
+        if: ${{ github.event_name == 'push' || inputs.deploy_backend }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: panda-api/target/*.jar
+          retention-days: 7
+
+      - name: Upload frontend artifact
+        if: ${{ github.event_name == 'push' || inputs.deploy_frontend }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          retention-days: 7
