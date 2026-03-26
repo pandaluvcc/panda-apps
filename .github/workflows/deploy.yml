@@ -19,6 +19,11 @@ on:
         required: true
         default: true
         type: boolean
+      upload_lib:
+        description: '强制上传 lib 目录'
+        required: false
+        default: false
+        type: boolean
       version:
         description: '版本号（可选）'
         required: false
@@ -70,57 +75,49 @@ jobs:
           cd frontend
           npm run build
 
+      # ==================== 配置 SSH ====================
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
       # ==================== 部署后端 ====================
       - name: Upload backend JAR to server
         if: ${{ github.event_name == 'push' || inputs.deploy_backend }}
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          port: ${{ secrets.SERVER_PORT || 22 }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "panda-api/target/*.jar"
-          target: ${{ env.BACKEND_DEPLOY_PATH }}
-          strip_components: 2
+        run: |
+          # 备份旧 JAR 包
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "if [ -f ${{ env.BACKEND_DEPLOY_PATH }}/panda-api-1.0.0-SNAPSHOT.jar ]; then mv ${{ env.BACKEND_DEPLOY_PATH }}/panda-api-1.0.0-SNAPSHOT.jar ${{ env.BACKEND_DEPLOY_PATH }}/panda-api-1.0.0-SNAPSHOT.jar-back\$(date +%Y%m%d%H%M%S); fi"
 
-      - name: Upload lib directory to server
+          # 上传 JAR 包
+          scp panda-api/target/panda-api-1.0.0-SNAPSHOT.jar ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ env.BACKEND_DEPLOY_PATH }}/
+
+      - name: Sync lib directory to server (incremental)
         if: ${{ github.event_name == 'push' || inputs.deploy_backend }}
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          port: ${{ secrets.SERVER_PORT || 22 }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "panda-api/target/lib/*"
-          target: ${{ env.BACKEND_DEPLOY_PATH }}
-          strip_components: 3
+        run: |
+          # 使用 rsync 增量同步 lib 目录
+          # --ignore-existing: 跳过服务器上已存在的文件
+          if [ "${{ inputs.upload_lib }}" = "true" ]; then
+            echo "强制上传整个 lib 目录..."
+            rsync -avz --delete panda-api/target/lib/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ env.BACKEND_DEPLOY_PATH }}/lib/
+          else
+            echo "增量同步 lib 目录（跳过已存在的文件）..."
+            rsync -avz --ignore-existing panda-api/target/lib/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ env.BACKEND_DEPLOY_PATH }}/lib/
+          fi
 
       - name: Deploy backend on server
         if: ${{ github.event_name == 'push' || inputs.deploy_backend }}
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          port: ${{ secrets.SERVER_PORT || 22 }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
+        run: |
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             cd ${{ env.BACKEND_DEPLOY_PATH }}
-
-            # 备份旧 JAR 包
-            if [ -f panda-api-1.0.0-SNAPSHOT.jar ]; then
-              mv panda-api-1.0.0-SNAPSHOT.jar panda-api-1.0.0-SNAPSHOT.jar-back$(date +%Y%m%d%H%M%S)
-            fi
-
-            # 移动上传的 JAR 包（scp 会保留目录结构）
-            if [ -f target/panda-api-1.0.0-SNAPSHOT.jar ]; then
-              mv target/panda-api-1.0.0-SNAPSHOT.jar .
-            fi
 
             # 执行部署脚本
             chmod +x deploy.sh
             ./deploy.sh restart
 
             echo "后端部署完成"
+          EOF
 
       # ==================== 部署前端 ====================
       - name: Package frontend
@@ -131,56 +128,31 @@ jobs:
 
       - name: Upload frontend to server
         if: ${{ github.event_name == 'push' || inputs.deploy_frontend }}
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          port: ${{ secrets.SERVER_PORT || 22 }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "frontend-dist.tar.gz"
-          target: /tmp
+        run: |
+          # 备份旧文件
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "if [ -d '${{ env.FRONTEND_DEPLOY_PATH }}' ] && [ \"\$(ls -A ${{ env.FRONTEND_DEPLOY_PATH }} 2>/dev/null)\" ]; then mv ${{ env.FRONTEND_DEPLOY_PATH }} ${{ env.FRONTEND_DEPLOY_PATH }}_backup_\$(date +%Y%m%d%H%M%S); fi"
 
-      - name: Deploy frontend on server
-        if: ${{ github.event_name == 'push' || inputs.deploy_frontend }}
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          port: ${{ secrets.SERVER_PORT || 22 }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            # 备份旧文件
-            if [ -d "${{ env.FRONTEND_DEPLOY_PATH }}" ] && [ "$(ls -A ${{ env.FRONTEND_DEPLOY_PATH }} 2>/dev/null)" ]; then
-              mv ${{ env.FRONTEND_DEPLOY_PATH }} ${{ env.FRONTEND_DEPLOY_PATH }}_backup_$(date +%Y%m%d%H%M%S)
-            fi
+          # 上传并解压
+          scp frontend-dist.tar.gz ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/tmp/
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "mkdir -p ${{ env.FRONTEND_DEPLOY_PATH }} && cd ${{ env.FRONTEND_DEPLOY_PATH }} && tar -xzf /tmp/frontend-dist.tar.gz && rm /tmp/frontend-dist.tar.gz"
 
-            # 创建目录并解压
-            mkdir -p ${{ env.FRONTEND_DEPLOY_PATH }}
-            cd ${{ env.FRONTEND_DEPLOY_PATH }}
-            tar -xzf /tmp/frontend-dist.tar.gz
-            rm /tmp/frontend-dist.tar.gz
-
-            echo "前端部署完成"
+          echo "前端部署完成"
 
       # ==================== 健康检查 ====================
       - name: Health check
         if: ${{ github.event_name == 'push' || inputs.deploy_backend }}
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          port: ${{ secrets.SERVER_PORT || 22 }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            echo "等待服务启动..."
-            sleep 10
+        run: |
+          echo "等待服务启动..."
+          sleep 10
 
-            # 检查容器状态
+          # 检查容器状态
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             docker ps --filter "name=panda-apps" --format "table {{.Names}}\t{{.Status}}"
 
             # 显示最近日志
             cd ${{ env.BACKEND_DEPLOY_PATH }}
             docker compose logs --tail=20 panda-apps
+          EOF
 
       # ==================== 上传构建产物（可选） ====================
       - name: Upload backend artifact
