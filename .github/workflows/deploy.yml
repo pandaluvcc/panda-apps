@@ -1,12 +1,12 @@
 name: Deploy to Server
 
 on:
-  # 标签触发：推送 v* 标签时自动部署
+  # 标签触发：推送 v* 标签时自动部署（部署全部）
   push:
     tags:
       - 'v*'
 
-  # 手动触发：在 GitHub Actions 页面点击运行
+  # 手动触发：在 GitHub Actions 页面点击运行（可选择部署内容）
   workflow_dispatch:
     inputs:
       deploy_backend:
@@ -35,34 +35,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  # 检测变更的文件
-  detect-changes:
-    runs-on: ubuntu-latest
-    outputs:
-      backend_changed: ${{ steps.filter.outputs.backend }}
-      frontend_changed: ${{ steps.filter.outputs.frontend }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Detect file changes
-        uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            backend:
-              - 'common/**'
-              - 'app-gridtrading/**'
-              - 'app-snapledger/**'
-              - 'panda-api/**'
-              - 'pom.xml'
-              - '**/pom.xml'
-            frontend:
-              - 'frontend/**'
-
   build-and-deploy:
-    needs: detect-changes
     runs-on: ubuntu-latest
 
     steps:
@@ -73,16 +46,16 @@ jobs:
       - name: Determine what to deploy
         id: deploy-decision
         run: |
-          # 标签触发时部署所有变更的部分
+          # 标签触发时部署全部（标签代表正式发布）
           if [ "${{ github.event_name }}" = "push" ]; then
-            DEPLOY_BACKEND="${{ needs.detect-changes.outputs.backend_changed }}"
-            DEPLOY_FRONTEND="${{ needs.detect-changes.outputs.frontend_changed }}"
-            echo "标签触发部署，检测到后端变更: $DEPLOY_BACKEND, 前端变更: $DEPLOY_FRONTEND"
+            DEPLOY_BACKEND="true"
+            DEPLOY_FRONTEND="true"
+            echo "📦 标签触发部署，部署全部内容"
           else
             # 手动触发时使用用户选择
             DEPLOY_BACKEND="${{ inputs.deploy_backend }}"
             DEPLOY_FRONTEND="${{ inputs.deploy_frontend }}"
-            echo "手动触发部署，用户选择后端: $DEPLOY_BACKEND, 前端: $DEPLOY_FRONTEND"
+            echo "🎯 手动触发部署，后端: $DEPLOY_BACKEND, 前端: $DEPLOY_FRONTEND"
           fi
 
           echo "deploy_backend=$DEPLOY_BACKEND" >> $GITHUB_OUTPUT
@@ -144,13 +117,11 @@ jobs:
         if: ${{ steps.deploy-decision.outputs.deploy_backend == 'true' }}
         run: |
           # 使用 rsync 增量同步 lib 目录
-          # --ignore-existing: 跳过服务器上已存在的文件
-          # --size-only: 只比较文件大小，加快检查速度
           if [ "${{ inputs.upload_lib }}" = "true" ]; then
-            echo "强制上传整个 lib 目录..."
+            echo "📤 强制上传整个 lib 目录..."
             rsync -avz --delete panda-api/target/lib/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ env.BACKEND_DEPLOY_PATH }}/lib/
           else
-            echo "增量同步 lib 目录（跳过已存在的文件）..."
+            echo "📤 增量同步 lib 目录..."
             rsync -avz --ignore-existing --size-only panda-api/target/lib/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ env.BACKEND_DEPLOY_PATH }}/lib/
           fi
 
@@ -159,12 +130,9 @@ jobs:
         run: |
           ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             cd ${{ env.BACKEND_DEPLOY_PATH }}
-
-            # 执行部署脚本
             chmod +x deploy.sh
             ./deploy.sh restart
-
-            echo "后端部署完成"
+            echo "✅ 后端部署完成"
           EOF
 
       # ==================== 部署前端 ====================
@@ -177,32 +145,24 @@ jobs:
       - name: Upload frontend to server
         if: ${{ steps.deploy-decision.outputs.deploy_frontend == 'true' }}
         run: |
-          # 备份旧文件
           ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "if [ -d '${{ env.FRONTEND_DEPLOY_PATH }}' ] && [ \"\$(ls -A ${{ env.FRONTEND_DEPLOY_PATH }} 2>/dev/null)\" ]; then mv ${{ env.FRONTEND_DEPLOY_PATH }} ${{ env.FRONTEND_DEPLOY_PATH }}_backup_\$(date +%Y%m%d%H%M%S); fi"
-
-          # 上传并解压
           scp frontend-dist.tar.gz ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/tmp/
           ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "mkdir -p ${{ env.FRONTEND_DEPLOY_PATH }} && cd ${{ env.FRONTEND_DEPLOY_PATH }} && tar -xzf /tmp/frontend-dist.tar.gz && rm /tmp/frontend-dist.tar.gz"
-
-          echo "前端部署完成"
+          echo "✅ 前端部署完成"
 
       # ==================== 健康检查 ====================
       - name: Health check
         if: ${{ steps.deploy-decision.outputs.deploy_backend == 'true' }}
         run: |
-          echo "等待服务启动..."
+          echo "⏳ 等待服务启动..."
           sleep 10
-
-          # 检查容器状态
           ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             docker ps --filter "name=panda-apps" --format "table {{.Names}}\t{{.Status}}"
-
-            # 显示最近日志
             cd ${{ env.BACKEND_DEPLOY_PATH }}
             docker compose logs --tail=20 panda-apps
           EOF
 
-      # ==================== 上传构建产物（可选） ====================
+      # ==================== 上传构建产物 ====================
       - name: Upload backend artifact
         if: ${{ steps.deploy-decision.outputs.deploy_backend == 'true' }}
         uses: actions/upload-artifact@v4
