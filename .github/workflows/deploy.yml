@@ -1,12 +1,12 @@
 name: Deploy to Server
 
 on:
-  # 标签触发：推送 v* 标签时自动部署（部署全部）
+  # 标签触发：推送 v* 标签时自动部署
   push:
     tags:
       - 'v*'
 
-  # 手动触发：在 GitHub Actions 页面点击运行（可选择部署内容）
+  # 手动触发：在 GitHub Actions 页面点击运行
   workflow_dispatch:
     inputs:
       deploy_backend:
@@ -35,7 +35,67 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # 检测变更的文件（与上一个标签对比）
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend_changed: ${{ steps.filter.outputs.backend }}
+      frontend_changed: ${{ steps.filter.outputs.frontend }}
+      is_first_release: ${{ steps.check-first.outputs.is_first }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 获取完整历史，用于比较
+
+      - name: Check if first release
+        id: check-first
+        run: |
+          # 获取所有标签
+          TAGS=$(git tag -l 'v*' | sort -V)
+          TAG_COUNT=$(echo "$TAGS" | wc -l)
+
+          if [ "$TAG_COUNT" -le 1 ]; then
+            echo "is_first=true" >> $GITHUB_OUTPUT
+            echo "🆕 首次发布，部署全部"
+          else
+            echo "is_first=false" >> $GITHUB_OUTPUT
+            # 获取上一个标签
+            PREV_TAG=$(echo "$TAGS" | tail -2 | head -1)
+            echo "📌 当前标签: ${{ github.ref_name }}"
+            echo "📌 上一个标签: $PREV_TAG"
+            echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Detect file changes
+        if: ${{ steps.check-first.outputs.is_first != 'true' }}
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          base: ${{ steps.check-first.outputs.prev_tag }}
+          filters: |
+            backend:
+              - 'common/**'
+              - 'app-gridtrading/**'
+              - 'app-snapledger/**'
+              - 'panda-api/**'
+              - 'pom.xml'
+              - '**/pom.xml'
+            frontend:
+              - 'frontend/**'
+
+      - name: Show changes
+        run: |
+          if [ "${{ steps.check-first.outputs.is_first }}" = "true" ]; then
+            echo "🆕 首次发布，将部署全部"
+          else
+            echo "📋 后端变更: ${{ steps.filter.outputs.backend }}"
+            echo "📋 前端变更: ${{ steps.filter.outputs.frontend }}"
+          fi
+
   build-and-deploy:
+    needs: detect-changes
     runs-on: ubuntu-latest
 
     steps:
@@ -46,16 +106,24 @@ jobs:
       - name: Determine what to deploy
         id: deploy-decision
         run: |
-          # 标签触发时部署全部（标签代表正式发布）
           if [ "${{ github.event_name }}" = "push" ]; then
-            DEPLOY_BACKEND="true"
-            DEPLOY_FRONTEND="true"
-            echo "📦 标签触发部署，部署全部内容"
+            # 标签触发时，根据变更检测决定
+            if [ "${{ needs.detect-changes.outputs.is_first_release }}" = "true" ]; then
+              # 首次发布，部署全部
+              DEPLOY_BACKEND="true"
+              DEPLOY_FRONTEND="true"
+              echo "🆕 首次发布，部署全部"
+            else
+              # 根据变更检测决定
+              DEPLOY_BACKEND="${{ needs.detect-changes.outputs.backend_changed }}"
+              DEPLOY_FRONTEND="${{ needs.detect-changes.outputs.frontend_changed }}"
+              echo "📋 变更检测: 后端=$DEPLOY_BACKEND, 前端=$DEPLOY_FRONTEND"
+            fi
           else
             # 手动触发时使用用户选择
             DEPLOY_BACKEND="${{ inputs.deploy_backend }}"
             DEPLOY_FRONTEND="${{ inputs.deploy_frontend }}"
-            echo "🎯 手动触发部署，后端: $DEPLOY_BACKEND, 前端: $DEPLOY_FRONTEND"
+            echo "🎯 手动触发，用户选择: 后端=$DEPLOY_BACKEND, 前端=$DEPLOY_FRONTEND"
           fi
 
           echo "deploy_backend=$DEPLOY_BACKEND" >> $GITHUB_OUTPUT
@@ -107,16 +175,12 @@ jobs:
       - name: Upload backend JAR to server
         if: ${{ steps.deploy-decision.outputs.deploy_backend == 'true' }}
         run: |
-          # 备份旧 JAR 包
           ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "if [ -f ${{ env.BACKEND_DEPLOY_PATH }}/panda-api-1.0.0-SNAPSHOT.jar ]; then mv ${{ env.BACKEND_DEPLOY_PATH }}/panda-api-1.0.0-SNAPSHOT.jar ${{ env.BACKEND_DEPLOY_PATH }}/panda-api-1.0.0-SNAPSHOT.jar-back\$(date +%Y%m%d%H%M%S); fi"
-
-          # 上传 JAR 包
           scp panda-api/target/panda-api-1.0.0-SNAPSHOT.jar ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ env.BACKEND_DEPLOY_PATH }}/
 
       - name: Sync lib directory to server (incremental)
         if: ${{ steps.deploy-decision.outputs.deploy_backend == 'true' }}
         run: |
-          # 使用 rsync 增量同步 lib 目录
           if [ "${{ inputs.upload_lib }}" = "true" ]; then
             echo "📤 强制上传整个 lib 目录..."
             rsync -avz --delete panda-api/target/lib/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ env.BACKEND_DEPLOY_PATH }}/lib/
@@ -164,7 +228,7 @@ jobs:
 
       # ==================== 上传构建产物 ====================
       - name: Upload backend artifact
-        if: ${{ steps.deploy-decision.outputs.deploy_backend == 'true' }}
+        if: ${{ steps.deploy-decision.outputs.deploy_frontend == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: backend-jar
