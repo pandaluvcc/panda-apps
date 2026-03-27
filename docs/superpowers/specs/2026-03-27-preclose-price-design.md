@@ -27,11 +27,19 @@
 ### 首页实时行情
 
 ```
-1. 前端调用 GET /api/quotes?symbols=xxx 获取实时行情
-2. 前端调用 PUT /api/strategies/{id}/last-price 更新价格
-3. 后端 PositionCalculator.updateByLastPrice 重新计算
-4. 前端刷新策略数据
+1. 前端判断是否在交易时间内（工作日 9:30-11:30, 13:00-15:02）
+2. 非交易时间：跳过实时行情获取，使用数据库中的 lastPrice
+3. 交易时间内：
+   a. 调用 GET /api/quotes?symbols=xxx 获取实时行情
+   b. 调用 PUT /api/strategies/{id}/last-price 更新价格
+   c. 后端 PositionCalculator.updateByLastPrice 重新计算
+   d. 前端刷新策略数据
 ```
+
+**交易时间判断逻辑：**
+- 工作日（周一至周五）
+- 上午：9:30 - 11:30
+- 下午：13:00 - 15:02（收盘后 2 分钟停止调用）
 
 ## 核心变更
 
