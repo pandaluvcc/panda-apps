@@ -36,7 +36,7 @@
       </div>
 
       <div class="price-row">
-        <span class="current-price">¥{{ formatPrice(displayPrice) }}</span>
+        <span class="current-price">¥{{ formatPrice(strategy.lastPrice || strategy.basePrice) }}</span>
         <span class="price-change" :class="priceChangeClass">
           {{ priceChangeText }}
         </span>
@@ -88,10 +88,6 @@ const props = defineProps({
   risks: {
     type: Array,
     default: () => []
-  },
-  realtimeQuote: {
-    type: Object,
-    default: null
   }
 })
 
@@ -106,38 +102,22 @@ const marketValue = computed(() => {
   return props.strategy.marketValue || props.strategy.position * (props.strategy.lastPrice || props.strategy.basePrice)
 })
 
-// 当前价格：优先使用实时行情，其次使用 lastPrice，最后使用 basePrice
-const displayPrice = computed(() => {
-  if (props.realtimeQuote?.currentPrice) {
-    return props.realtimeQuote.currentPrice
-  }
-  return props.strategy.lastPrice || props.strategy.basePrice
-})
-
-// 涨跌幅：优先使用实时行情的涨跌幅
-const displayChangePercent = computed(() => {
-  if (props.realtimeQuote?.changePercent !== undefined) {
-    return props.realtimeQuote.changePercent
-  }
-  // 回退到成本价计算
-  const lastPrice = props.strategy.lastPrice || 0
-  const costPrice = props.strategy.costPrice || 0
-  if (costPrice === 0) return null
-  return ((lastPrice - costPrice) / costPrice) * 100
-})
-
+// 涨跌幅计算：使用 preClosePrice（昨日收盘价）
 const priceChangeClass = computed(() => {
-  const changePercent = displayChangePercent.value
-  if (changePercent === null || changePercent === undefined) return ''
-  if (changePercent > 0) return 'up'
-  if (changePercent < 0) return 'down'
+  const lastPrice = props.strategy.lastPrice || 0
+  const preClosePrice = props.strategy.preClosePrice || props.strategy.costPrice || 0
+  if (lastPrice > preClosePrice) return 'up'
+  if (lastPrice < preClosePrice) return 'down'
   return ''
 })
 
 const priceChangeText = computed(() => {
-  const changePercent = displayChangePercent.value
-  if (changePercent === null || changePercent === undefined) return '--'
-  const sign = changePercent >= 0 ? '+' : ''
+  const lastPrice = props.strategy.lastPrice || 0
+  const preClosePrice = props.strategy.preClosePrice || props.strategy.costPrice || 0
+  if (preClosePrice === 0) return '--'
+  const change = lastPrice - preClosePrice
+  const changePercent = (change / preClosePrice) * 100
+  const sign = change >= 0 ? '+' : ''
   return `${sign}${changePercent.toFixed(2)}%`
 })
 

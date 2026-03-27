@@ -38,7 +38,6 @@
           :strategy="s"
           :suggestions="strategySuggestions[s.id]"
           :risks="getRisksForStrategy(s.id)"
-          :realtime-quote="realtimeQuotes[s.symbol]"
           @click="goToDetail(s)"
           @deleted="handleStrategyDeleted"
         />
@@ -59,6 +58,7 @@ import { useStrategyStore } from '@/stores/gridtrading/strategy'
 import { useStrategySuggestions } from '@/composables/gridtrading/useStrategySuggestions'
 import { useStrategyRisks } from '@/composables/gridtrading/useStrategyRisks'
 import { getQuotes } from '@/api/gridtrading/quote'
+import { updateStrategyLastPrice } from '@/api/gridtrading/strategy'
 import MobileLayout from './Layout.vue'
 import HomeHeader from './components/HomeHeader.vue'
 import StrategyCard from './components/StrategyCard.vue'
@@ -70,7 +70,27 @@ const { strategySuggestions, totalSuggestionsCount, fetchSuggestions } = useStra
 const { strategyRisks, getRisksForStrategy, fetchRisks } = useStrategyRisks()
 
 const showBatchUpdateDialog = ref(false)
-const realtimeQuotes = ref({}) // 存储实时行情数据
+
+// 判断是否在交易时间内（工作日 9:30 - 15:02）
+const isInTradingTime = () => {
+  const now = new Date()
+  const day = now.getDay()
+  // 周末不交易
+  if (day === 0 || day === 6) return false
+
+  const hours = now.getHours()
+  const minutes = now.getMinutes()
+  const totalMinutes = hours * 60 + minutes
+
+  // 上午 9:30 - 11:30，下午 13:00 - 15:02
+  const morningStart = 9 * 60 + 30  // 9:30
+  const morningEnd = 11 * 60 + 30   // 11:30
+  const afternoonStart = 13 * 60    // 13:00
+  const afternoonEnd = 15 * 60 + 2  // 15:02
+
+  return (totalMinutes >= morningStart && totalMinutes <= morningEnd) ||
+         (totalMinutes >= afternoonStart && totalMinutes <= afternoonEnd)
+}
 
 onMounted(() => {
   loadHomeData()
@@ -93,16 +113,29 @@ const loadHomeData = async () => {
 const fetchRealtimeQuotes = async () => {
   if (strategyStore.strategies.length === 0) return
 
+  // 非交易时间不调用实时行情接口
+  if (!isInTradingTime()) {
+    console.log('非交易时间，跳过实时行情获取')
+    return
+  }
+
   try {
     // 提取所有策略的 symbol，去重
     const symbols = [...new Set(strategyStore.strategies.map((s) => s.symbol))]
     if (symbols.length === 0) return
 
     const quotes = await getQuotes(symbols)
-    // 转换为 { symbol: quote } 格式
-    quotes.forEach((quote) => {
-      realtimeQuotes.value[quote.symbol] = quote
-    })
+
+    // 为每个策略更新价格（触发后端计算）
+    for (const strategy of strategyStore.strategies) {
+      const quote = quotes.find(q => q.symbol === strategy.symbol)
+      if (quote) {
+        await updateStrategyLastPrice(strategy.id, quote.currentPrice)
+      }
+    }
+
+    // 重新获取策略数据（包含计算后的最新值）
+    await strategyStore.fetchStrategies()
   } catch (e) {
     console.error('获取实时行情失败:', e)
     // 行情获取失败不影响页面显示

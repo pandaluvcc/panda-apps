@@ -133,6 +133,12 @@ public class Strategy {
     private BigDecimal lastPrice;
 
     /**
+     * 昨日收盘价（每日定时任务更新）
+     */
+    @Column(name = "pre_close_price", precision = 20, scale = 3)
+    private BigDecimal preClosePrice;
+
+    /**
      * 可用资金
      */
     @Column(nullable = false, precision = 20, scale = 3)

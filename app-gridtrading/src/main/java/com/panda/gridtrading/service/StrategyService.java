@@ -649,6 +649,30 @@ public class StrategyService {
      * 计算当日参考盈亏
      */
     private void calculateTodayProfit(StrategyDetailDTO dto, Strategy strategy) {
+        // 当日涨跌幅计算：优先使用 preClosePrice
+        BigDecimal todayProfitPercent = BigDecimal.ZERO;
+
+        if (strategy.getPreClosePrice() != null && strategy.getPreClosePrice().compareTo(BigDecimal.ZERO) > 0) {
+            // 当日涨跌幅 = (lastPrice - preClosePrice) / preClosePrice × 100%
+            BigDecimal lastPrice = strategy.getLastPrice() != null ? strategy.getLastPrice() : strategy.getBasePrice();
+            todayProfitPercent = lastPrice.subtract(strategy.getPreClosePrice())
+                    .divide(strategy.getPreClosePrice(), 4, RoundingMode.HALF_UP)
+                    .multiply(new BigDecimal("100"))
+                    .setScale(2, RoundingMode.HALF_UP);
+            dto.setTodayProfitPercent(todayProfitPercent);
+
+            // 计算当日盈亏金额
+            BigDecimal position = strategy.getPosition() != null ? strategy.getPosition() : BigDecimal.ZERO;
+            if (position.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal todayProfit = lastPrice.subtract(strategy.getPreClosePrice())
+                        .multiply(position)
+                        .setScale(2, RoundingMode.HALF_UP);
+                dto.setTodayProfit(todayProfit);
+            }
+            return;
+        }
+
+        // 回退：使用原有逻辑（历史兼容）
         LocalDateTime todayStart = LocalDateTime.now().toLocalDate().atStartOfDay();
         List<TradeRecord> allRecords = tradeRecordRepository.findByStrategyIdOrderByTradeTimeAsc(strategy.getId());
 
@@ -701,7 +725,6 @@ public class StrategyService {
         BigDecimal currentPosition = strategy.getPosition() != null ? strategy.getPosition() : BigDecimal.ZERO;
 
         BigDecimal todayProfit = BigDecimal.ZERO;
-        BigDecimal todayProfitPercent = BigDecimal.ZERO;
 
         if (yesterdayPosition.compareTo(BigDecimal.ZERO) > 0 && currentPrice != null) {
             BigDecimal yesterdayMarketValue = currentPrice.multiply(yesterdayPosition);
