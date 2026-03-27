@@ -1,5 +1,9 @@
 <template>
   <el-dialog v-model="visible" title="批量更新行情" width="90%" @close="handleClose">
+    <div v-if="loadingQuotes" class="loading-hint">
+      <el-icon class="is-loading"><Loading /></el-icon>
+      <span>正在获取实时行情...</span>
+    </div>
     <div class="update-list">
       <div v-for="strategy in strategies" :key="strategy.id" class="update-item">
         <div class="strategy-info">
@@ -29,7 +33,9 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Loading } from '@element-plus/icons-vue'
 import { updateStrategyLastPrice } from '@/api/gridtrading/strategy'
+import { getQuotes } from '@/api/gridtrading/quote'
 import { formatPrice } from '@/utils/format'
 
 const props = defineProps({
@@ -52,6 +58,41 @@ const visible = computed({
 
 const priceMap = ref({})
 const updating = ref(false)
+const loadingQuotes = ref(false)
+
+// 监听弹出框打开，获取实时行情填充
+watch(
+  () => props.modelValue,
+  async (isOpen) => {
+    if (isOpen && props.strategies.length > 0) {
+      // 初始化空值
+      priceMap.value = {}
+      props.strategies.forEach((s) => {
+        priceMap.value[s.id] = ''
+      })
+
+      // 获取实时行情填充
+      loadingQuotes.value = true
+      try {
+        const symbols = [...new Set(props.strategies.map((s) => s.symbol))]
+        const quotes = await getQuotes(symbols)
+
+        // 填充实时价格
+        props.strategies.forEach((s) => {
+          const quote = quotes.find((q) => q.symbol === s.symbol)
+          if (quote && quote.currentPrice) {
+            priceMap.value[s.id] = quote.currentPrice.toString()
+          }
+        })
+      } catch (e) {
+        console.error('获取实时行情失败:', e)
+        // 失败时保持空白，用户手动输入
+      } finally {
+        loadingQuotes.value = false
+      }
+    }
+  }
+)
 
 watch(
   () => props.strategies,
@@ -131,5 +172,15 @@ const handleUpdate = async () => {
 .strategy-price {
   font-size: 12px;
   color: #909399;
+}
+
+.loading-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px;
+  color: #909399;
+  font-size: 14px;
 }
 </style>
