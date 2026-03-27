@@ -10,6 +10,30 @@
 - 前端主动请求时才获取，不用时不调用（控制频率）
 - 用于网格应用界面展示实时价格
 
+## 业务场景
+
+### 场景 1：首页策略列表（需要实时价格）
+
+**触发条件：** 用户进入网格应用首页，且策略列表不为空
+
+**调用时机：**
+- 页面加载完成后，前端批量请求所有策略对应的 ETF 实时价格
+- 策略列表为空时，不调用行情接口
+
+**展示内容：**
+- 每个策略卡片显示对应 ETF 的当前价格和涨跌幅
+- 可选：价格涨跌颜色标识（红涨绿跌）
+
+### 场景 2：策略详情页（暂不需要）
+
+**当前决策：** 策略详情页暂不调用实时行情接口
+
+**原因：**
+- 详情页已有 `lastPrice` 字段（手动更新或交易时更新）
+- 避免不必要的接口调用，节省免费接口配额
+
+**后续扩展：** 如需在详情页展示实时价格，可复用同一接口
+
 ## 数据源方案
 
 ### 主方案：新浪财经接口
@@ -90,8 +114,9 @@ public List<QuoteDTO> getQuotes(List<String> symbols); // 批量获取行情
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/quotes/{symbol}` | 获取单个股票行情 |
-| GET | `/api/quotes?symbols=sh600519,sz000001` | 批量获取行情 |
+| GET | `/api/quotes?symbols=sh600519,sz000001` | 批量获取行情（首页使用） |
+
+**Why：** 首页需要一次性获取所有策略对应的 ETF 价格，批量接口减少 HTTP 请求次数
 
 **响应示例：**
 ```json
@@ -165,11 +190,11 @@ app-gridtrading/src/main/java/com/panda/gridtrading/
 
 ## 实现优先级
 
-1. **P0 - 核心功能**
+1. **P0 - 核心功能（首页场景）**
    - QuoteDTO 数据结构
    - SinaQuoteProvider 新浪财经实现
-   - QuoteService 核心服务
-   - QuoteController API 端点
+   - QuoteService 核心服务（批量获取）
+   - QuoteController 批量查询 API 端点
 
 2. **P1 - 增强功能**
    - EastMoneyQuoteProvider 东方财富实现
@@ -178,7 +203,7 @@ app-gridtrading/src/main/java/com/panda/gridtrading/
 
 3. **P2 - 可选功能**
    - QuoteCache 缓存机制
-   - 批量查询接口
+   - 单只股票查询接口（如后续详情页需要）
 
 ## 测试策略
 
