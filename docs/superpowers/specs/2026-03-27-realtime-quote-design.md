@@ -36,13 +36,19 @@
 
 ## 数据源方案
 
+**支持标的：** A股股票、ETF基金（接口格式相同）
+
 ### 主方案：新浪财经接口
 
 **接口地址：** `https://hq.sinajs.cn/list={symbol}`
 
-**股票代码格式：**
-- 上海证券交易所：`sh` + 6位代码（如 `sh600519` 贵州茅台）
-- 深圳证券交易所：`sz` + 6位代码（如 `sz000001` 平安银行）
+**代码格式：**
+- 上海证券交易所：`sh` + 6位代码
+  - 股票：`sh600519`（贵州茅台）
+  - ETF：`sh510500`（中证500ETF）、`sh510300`（沪深300ETF）
+- 深圳证券交易所：`sz` + 6位代码
+  - 股票：`sz000001`（平安银行）
+  - ETF：`sz159915`（创业板ETF）
 
 **响应示例：**
 ```
@@ -114,9 +120,8 @@ public List<QuoteDTO> getQuotes(List<String> symbols); // 批量获取行情
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/quotes?symbols=sh600519,sz000001` | 批量获取行情（首页使用） |
-
-**Why：** 首页需要一次性获取所有策略对应的 ETF 价格，批量接口减少 HTTP 请求次数
+| GET | `/api/quotes/{symbol}` | 获取单个标的行情 |
+| GET | `/api/quotes?symbols=sh510500,sz159915` | 批量获取行情（首页使用） |
 
 **响应示例：**
 ```json
@@ -190,11 +195,11 @@ app-gridtrading/src/main/java/com/panda/gridtrading/
 
 ## 实现优先级
 
-1. **P0 - 核心功能（首页场景）**
+1. **P0 - 核心功能**
    - QuoteDTO 数据结构
    - SinaQuoteProvider 新浪财经实现
-   - QuoteService 核心服务（批量获取）
-   - QuoteController 批量查询 API 端点
+   - QuoteService 核心服务（单个 + 批量获取）
+   - QuoteController API 端点（单个 + 批量查询）
 
 2. **P1 - 增强功能**
    - EastMoneyQuoteProvider 东方财富实现
@@ -203,7 +208,6 @@ app-gridtrading/src/main/java/com/panda/gridtrading/
 
 3. **P2 - 可选功能**
    - QuoteCache 缓存机制
-   - 单只股票查询接口（如后续详情页需要）
 
 ## 测试策略
 
