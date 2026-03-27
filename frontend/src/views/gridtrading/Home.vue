@@ -38,6 +38,7 @@
           :strategy="s"
           :suggestions="strategySuggestions[s.id]"
           :risks="getRisksForStrategy(s.id)"
+          :realtime-quote="realtimeQuotes[s.symbol]"
           @click="goToDetail(s)"
           @deleted="handleStrategyDeleted"
         />
@@ -57,6 +58,7 @@ import { Plus, DataLine } from '@element-plus/icons-vue'
 import { useStrategyStore } from '@/stores/gridtrading/strategy'
 import { useStrategySuggestions } from '@/composables/gridtrading/useStrategySuggestions'
 import { useStrategyRisks } from '@/composables/gridtrading/useStrategyRisks'
+import { getQuotes } from '@/api/gridtrading/quote'
 import MobileLayout from './Layout.vue'
 import HomeHeader from './components/HomeHeader.vue'
 import StrategyCard from './components/StrategyCard.vue'
@@ -68,6 +70,7 @@ const { strategySuggestions, totalSuggestionsCount, fetchSuggestions } = useStra
 const { strategyRisks, getRisksForStrategy, fetchRisks } = useStrategyRisks()
 
 const showBatchUpdateDialog = ref(false)
+const realtimeQuotes = ref({}) // 存储实时行情数据
 
 onMounted(() => {
   loadHomeData()
@@ -79,8 +82,30 @@ const loadHomeData = async () => {
     const strategyIds = strategyStore.strategies.map((s) => s.id)
     // 同时获取建议和风险数据
     await Promise.all([fetchSuggestions(strategyIds), fetchRisks(strategyIds)])
+    // 获取实时行情（策略不为空时）
+    await fetchRealtimeQuotes()
   } catch (e) {
     ElMessage.error('加载失败：' + (e.message || e))
+  }
+}
+
+// 获取所有策略的实时行情
+const fetchRealtimeQuotes = async () => {
+  if (strategyStore.strategies.length === 0) return
+
+  try {
+    // 提取所有策略的 symbol，去重
+    const symbols = [...new Set(strategyStore.strategies.map((s) => s.symbol))]
+    if (symbols.length === 0) return
+
+    const quotes = await getQuotes(symbols)
+    // 转换为 { symbol: quote } 格式
+    quotes.forEach((quote) => {
+      realtimeQuotes.value[quote.symbol] = quote
+    })
+  } catch (e) {
+    console.error('获取实时行情失败:', e)
+    // 行情获取失败不影响页面显示
   }
 }
 
