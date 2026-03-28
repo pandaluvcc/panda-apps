@@ -18,7 +18,14 @@ export const useStrategyStore = defineStore('strategy', () => {
   })
 
   const todayProfit = computed(() => {
-    return strategies.value.reduce((sum, s) => sum + (s.todayProfit || 0), 0)
+    return strategies.value.reduce((sum, s) => {
+      // 今日盈亏 = (当前价 - 昨日收盘价) × 持仓数量
+      const lastPrice = s.lastPrice || 0
+      const preClosePrice = s.preClosePrice || 0
+      const position = s.position || 0
+      const profit = (lastPrice - preClosePrice) * position
+      return sum + profit
+    }, 0)
   })
 
   const runningStrategies = computed(() => {

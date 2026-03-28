@@ -28,6 +28,7 @@ public class StrategyResponse {
     private BigDecimal positionProfitPercent;
     private BigDecimal positionRatio;
     private BigDecimal marketValue; // 市值 = 持仓数量 × 当前现价
+    private BigDecimal preClosePrice; // 昨日收盘价，用于计算今日盈亏
 
     public StrategyResponse() {
     }
@@ -53,6 +54,7 @@ public class StrategyResponse {
         response.setPositionProfit(strategy.getPositionProfit());
         response.setPositionProfitPercent(strategy.getPositionProfitPercent());
         response.setPositionRatio(strategy.getPositionRatio());
+        response.setPreClosePrice(strategy.getPreClosePrice());
         // 计算市值 = 持仓数量 × 当前现价
         if (strategy.getPosition() != null && strategy.getLastPrice() != null) {
             response.setMarketValue(strategy.getPosition().multiply(strategy.getLastPrice()).setScale(2, RoundingMode.HALF_UP));
@@ -188,5 +190,13 @@ public class StrategyResponse {
 
     public void setMarketValue(BigDecimal marketValue) {
         this.marketValue = marketValue;
+    }
+
+    public BigDecimal getPreClosePrice() {
+        return preClosePrice;
+    }
+
+    public void setPreClosePrice(BigDecimal preClosePrice) {
+        this.preClosePrice = preClosePrice;
     }
 }

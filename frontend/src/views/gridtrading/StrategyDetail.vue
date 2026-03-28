@@ -150,6 +150,7 @@ import { Upload, CircleCloseFilled } from '@element-plus/icons-vue'
 import { getStrategyDetail, updateStrategyLastPrice } from '@/api/gridtrading/strategy'
 import { getGridLines, executeTick } from '@/api/gridtrading/grid'
 import { getTradeRecords, updateTradeFee } from '@/api/gridtrading/trade'
+import { useStrategyStore } from '@/stores/gridtrading/strategy'
 import MobileLayout from './Layout.vue'
 import StrategyHeader from './components/StrategyHeader.vue'
 import RiskAlertDialog from './components/RiskAlertDialog.vue'
@@ -163,6 +164,7 @@ import OcrImportDialog from './components/OcrImportDialog.vue'
 import TradeExecuteDialog from './components/TradeExecuteDialog.vue'
 
 const route = useRoute()
+const strategyStore = useStrategyStore()
 const strategyId = computed(() => Number(route.params.id))
 
 const loading = ref(true)
@@ -217,7 +219,14 @@ const todayProfitPercent = computed(() => {
 })
 const todayProfitPercentValue = computed(() => strategy.value?.todayProfitPercent || 0)
 const holdingDays = computed(() => strategy.value?.holdingDays || 0)
-const positionRatio = computed(() => strategy.value?.positionRatio || 0)
+// 仓位 = 当前策略市值 / 所有策略总市值
+const positionRatio = computed(() => {
+  if (!strategy.value) return 0
+  const marketValue = strategy.value.marketValue || strategy.value.position * (strategy.value.lastPrice || strategy.value.basePrice || 0)
+  const total = strategyStore.totalMarketValue
+  if (total === 0) return 0
+  return (marketValue / total) * 100
+})
 const costPrice = computed(() => strategy.value?.costPrice || 0)
 const totalFee = computed(() => strategy.value?.totalFee || 0)
 const averageBuyPrice = computed(() => strategy.value?.avgBuyPrice || strategy.value?.averageBuyPrice || 0)
@@ -241,10 +250,12 @@ watch(strategyId, () => {
 const loadStrategyDetail = async () => {
   loading.value = true
   try {
+    // 同时获取策略列表用于计算仓位比例
     const [strategyRes, gridRes, tradeRes] = await Promise.all([
       getStrategyDetail(strategyId.value),
       getGridLines(strategyId.value),
-      getTradeRecords(strategyId.value)
+      getTradeRecords(strategyId.value),
+      strategyStore.fetchStrategies()
     ])
     // axios 拦截器已解包，res 直接是数据
     strategy.value = strategyRes

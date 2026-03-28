@@ -245,6 +245,13 @@ const getProfitClass = (val) => {
   background: linear-gradient(135deg, var(--bg-card) 0%, rgba(255, 230, 180, 0.55) 100%);
 }
 
+/* 深色模式：使用更柔和的渐变 */
+@media (prefers-color-scheme: dark) {
+  .grid-card.state-bought {
+    background: linear-gradient(135deg, var(--bg-card) 0%, rgba(255, 200, 100, 0.12) 100%);
+  }
+}
+
 /* 行布局 */
 .row {
   display: flex;
