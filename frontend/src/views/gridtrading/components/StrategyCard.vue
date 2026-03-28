@@ -5,7 +5,6 @@
         <div class="card-title">
           <div class="title-row">
             <span class="strategy-name">{{ strategy.name || strategy.symbol }}</span>
-            <span class="market-value">市值 ¥{{ formatAmount(marketValue) }}</span>
           </div>
           <div class="strategy-code" v-if="strategy.name">{{ strategy.symbol }}</div>
         </div>
@@ -36,13 +35,17 @@
       </div>
 
       <div class="price-row">
-        <span class="current-price">¥{{ formatPrice(strategy.lastPrice || strategy.basePrice) }}</span>
+        <span class="current-price">¥{{ formatAmount(marketValue) }}</span>
         <span class="price-change" :class="priceChangeClass">
           {{ priceChangeText }}
         </span>
       </div>
 
       <div class="stats-row">
+        <div class="stat-item">
+          <span class="stat-label">现价</span>
+          <span class="stat-value">¥{{ formatPrice(strategy.lastPrice || strategy.basePrice) }}</span>
+        </div>
         <div class="stat-item">
           <span class="stat-label">成本</span>
           <span class="stat-value">¥{{ formatPrice(strategy.costPrice) }}</span>
@@ -118,7 +121,7 @@ const priceChangeText = computed(() => {
   const change = lastPrice - preClosePrice
   const changePercent = (change / preClosePrice) * 100
   const sign = change >= 0 ? '+' : ''
-  return `${sign}${changePercent.toFixed(2)}%`
+  return `${sign}${changePercent.toFixed(3)}%`
 })
 
 const risksTooltip = computed(() => {
@@ -204,12 +207,6 @@ const handleDelete = async () => {
   font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
-}
-
-.market-value {
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-weight: 500;
 }
 
 .strategy-code {

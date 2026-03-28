@@ -106,7 +106,7 @@ const switchTab = (tab) => {
   right: 0;
   height: 50px;
   padding-top: env(safe-area-inset-top);
-  background: var(--primary-gradient);
+  background: var(--bg-card);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -114,26 +114,31 @@ const switchTab = (tab) => {
   padding-right: 12px;
   padding-bottom: 0;
   z-index: 100;
-  box-shadow: var(--shadow-sm);
+  border-bottom: 1px solid var(--border-lighter);
 }
 
-.header-left,
-.header-right {
+.header-left {
   width: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .back-btn {
   font-size: 22px;
-  color: #fff;
+  color: var(--text-primary);
   cursor: pointer;
   transition: opacity var(--transition-fast);
 }
 
 .back-btn:active {
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 .header-title {
@@ -141,7 +146,7 @@ const switchTab = (tab) => {
   text-align: center;
   font-size: 17px;
   font-weight: 600;
-  color: #fff;
+  color: var(--text-primary);
   margin: 0;
 }
 

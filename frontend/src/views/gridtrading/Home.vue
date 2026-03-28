@@ -1,13 +1,23 @@
 <template>
   <MobileLayout title="我的网格" :show-back="true" :show-tab-bar="false" back-to="/">
+    <!-- 导航栏右侧按钮 -->
+    <template #header-right>
+      <div class="nav-icon-btn" @click="goToMessageCenter">
+        <el-badge v-if="totalSuggestionsCount > 0" :value="totalSuggestionsCount" class="nav-badge">
+          <el-icon class="nav-icon"><Bell /></el-icon>
+        </el-badge>
+        <el-icon v-else class="nav-icon"><Bell /></el-icon>
+      </div>
+      <div class="nav-icon-btn" @click="showBatchUpdateDialog = true">
+        <el-icon class="nav-icon"><RefreshRight /></el-icon>
+      </div>
+    </template>
+
     <!-- 头部区域 -->
     <HomeHeader
-      :message-count="totalSuggestionsCount"
       :total-market-value="strategyStore.totalMarketValue"
       :total-position-profit="strategyStore.totalPositionProfit"
       :today-profit="strategyStore.todayProfit"
-      @go-message="goToMessageCenter"
-      @batch-update="showBatchUpdateDialog = true"
     />
 
     <!-- 策略列表 -->
@@ -53,7 +63,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Plus, DataLine } from '@element-plus/icons-vue'
+import { Plus, DataLine, Bell, RefreshRight } from '@element-plus/icons-vue'
 import { useStrategyStore } from '@/stores/gridtrading/strategy'
 import { useStrategySuggestions } from '@/composables/gridtrading/useStrategySuggestions'
 import { useStrategyRisks } from '@/composables/gridtrading/useStrategyRisks'
@@ -162,6 +172,30 @@ const handleStrategyDeleted = (strategyId) => {
 </script>
 
 <style scoped>
+.nav-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background-color var(--transition-fast);
+}
+
+.nav-icon-btn:active {
+  background: var(--bg-light);
+}
+
+.nav-icon {
+  font-size: 20px;
+  color: var(--text-primary);
+}
+
+.nav-badge {
+  --el-badge-background-color: var(--danger-color);
+}
+
 .strategy-section {
   padding: 20px 16px;
 }

@@ -60,16 +60,21 @@ const priceMap = ref({})
 const updating = ref(false)
 const loadingQuotes = ref(false)
 
+// 初始化价格表
+const initPriceMap = (strategies) => {
+  priceMap.value = {}
+  strategies.forEach((s) => {
+    priceMap.value[s.id] = ''
+  })
+}
+
 // 监听弹出框打开，获取实时行情填充
 watch(
   () => props.modelValue,
   async (isOpen) => {
     if (isOpen && props.strategies.length > 0) {
       // 初始化空值
-      priceMap.value = {}
-      props.strategies.forEach((s) => {
-        priceMap.value[s.id] = ''
-      })
+      initPriceMap(props.strategies)
 
       // 获取实时行情填充
       loadingQuotes.value = true
@@ -92,17 +97,6 @@ watch(
       }
     }
   }
-)
-
-watch(
-  () => props.strategies,
-  (newVal) => {
-    priceMap.value = {}
-    newVal.forEach((s) => {
-      priceMap.value[s.id] = ''
-    })
-  },
-  { immediate: true }
 )
 
 const handleClose = () => {
