@@ -225,7 +225,7 @@ const positionRatio = computed(() => {
   const marketValue = strategy.value.marketValue || strategy.value.position * (strategy.value.lastPrice || strategy.value.basePrice || 0)
   const total = strategyStore.totalMarketValue
   if (total === 0) return 0
-  return (marketValue / total) * 100
+  return Math.round((marketValue / total) * 100)
 })
 const costPrice = computed(() => strategy.value?.costPrice || 0)
 const totalFee = computed(() => strategy.value?.totalFee || 0)
