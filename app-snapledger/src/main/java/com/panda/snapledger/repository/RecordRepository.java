@@ -53,4 +53,7 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
 
     // 按 ID 列表查询
     List<Record> findByIdIn(List<Long> ids);
+
+    // 按账户查询（按日期时间倒序）
+    List<Record> findByAccountOrderByDateDescTimeDesc(String account);
 }
