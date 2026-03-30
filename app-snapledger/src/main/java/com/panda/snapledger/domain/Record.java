@@ -71,6 +71,17 @@ public class Record {
     @Column(name = "target", length = 50)
     private String target;
 
+    @Column(name = "reconciliation_status", length = 20)
+    private String reconciliationStatus = RECONCILIATION_UNRECONCILED;
+
+    @Column(name = "postponed_to_cycle", length = 10)
+    private String postponedToCycle;
+
+    // 对账状态常量
+    public static final String RECONCILIATION_UNRECONCILED = "UNRECONCILED";
+    public static final String RECONCILIATION_CONFIRMED = "CONFIRMED";
+    public static final String RECONCILIATION_POSTPONED = "POSTPONED";
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
