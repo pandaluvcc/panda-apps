@@ -37,4 +37,20 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
 
     @Query("SELECT SUM(r.amount) FROM Record r WHERE YEAR(r.date) = :year AND MONTH(r.date) = :month AND r.recordType = '支出'")
     BigDecimal sumExpenseByMonth(@Param("year") int year, @Param("month") int month);
+
+    // 按账户和对账状态查询
+    List<Record> findByAccountAndReconciliationStatus(String account, String status);
+
+    // 按账户和对账状态排除查询
+    List<Record> findByAccountAndReconciliationStatusNot(String account, String status);
+
+    // 按账户和日期范围查询（用于账单周期）
+    List<Record> findByAccountAndDateBetween(String account, LocalDate startDate, LocalDate endDate);
+
+    // 按账户、日期范围和对账状态查询
+    List<Record> findByAccountAndDateBetweenAndReconciliationStatusNot(
+        String account, LocalDate startDate, LocalDate endDate, String status);
+
+    // 按 ID 列表查询
+    List<Record> findByIdIn(List<Long> ids);
 }
