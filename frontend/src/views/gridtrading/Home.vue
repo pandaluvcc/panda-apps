@@ -60,7 +60,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Plus, DataLine, Bell, RefreshRight } from '@element-plus/icons-vue'
@@ -80,6 +80,7 @@ const { strategySuggestions, totalSuggestionsCount, fetchSuggestions } = useStra
 const { strategyRisks, getRisksForStrategy, fetchRisks } = useStrategyRisks()
 
 const showBatchUpdateDialog = ref(false)
+const refreshTimer = ref(null)
 
 // 判断是否在交易时间内（工作日 9:30 - 15:02）
 const isInTradingTime = () => {
@@ -102,8 +103,34 @@ const isInTradingTime = () => {
          (totalMinutes >= afternoonStart && totalMinutes <= afternoonEnd)
 }
 
+// 启动定时刷新
+const startAutoRefresh = () => {
+  // 先立即执行一次
+  fetchRealtimeQuotes()
+
+  // 每 3 秒刷新一次
+  refreshTimer.value = setInterval(() => {
+    if (isInTradingTime()) {
+      fetchRealtimeQuotes()
+    }
+  }, 3000)
+}
+
+// 停止定时刷新
+const stopAutoRefresh = () => {
+  if (refreshTimer.value) {
+    clearInterval(refreshTimer.value)
+    refreshTimer.value = null
+  }
+}
+
 onMounted(() => {
   loadHomeData()
+  startAutoRefresh()
+})
+
+onUnmounted(() => {
+  stopAutoRefresh()
 })
 
 const loadHomeData = async () => {
@@ -125,7 +152,6 @@ const fetchRealtimeQuotes = async () => {
 
   // 非交易时间不调用实时行情接口
   if (!isInTradingTime()) {
-    console.log('非交易时间，跳过实时行情获取')
     return
   }
 
@@ -147,7 +173,7 @@ const fetchRealtimeQuotes = async () => {
     // 重新获取策略数据（包含计算后的最新值）
     await strategyStore.fetchStrategies()
   } catch (e) {
-    console.error('获取实时行情失败:', e)
+    console.log('获取实时行情失败:', e)
     // 行情获取失败不影响页面显示
   }
 }

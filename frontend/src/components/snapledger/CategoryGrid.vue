@@ -15,8 +15,8 @@
           :class="{ selected: selectedMainCategory === cat.name }"
           @click="selectMainCategory(cat)"
         >
-          <div class="icon-container">
-            <van-icon :name="cat.icon || 'notes-o'" size="24" />
+          <div class="icon-container" :style="{ backgroundColor: getCategoryColor(cat.name) }">
+            <van-icon :name="cat.icon || 'notes-o'" size="28" color="#FFFFFF" />
           </div>
           <span class="item-text">{{ cat.name }}</span>
         </div>
@@ -25,8 +25,8 @@
       <!-- 子类别模式 -->
       <template v-else>
         <div class="grid-item" @click="goBackToMain">
-          <div class="icon-container back-icon">
-            <van-icon name="arrow-left" size="24" />
+          <div class="icon-container back-icon" style="background: #E0E0E0;">
+            <van-icon name="arrow-left" size="24" color="#666666" />
           </div>
           <span class="item-text">返回</span>
         </div>
@@ -37,8 +37,8 @@
           :class="{ selected: selectedSubCategory === sub.subCategory }"
           @click="selectSubCategory(sub)"
         >
-          <div class="icon-container">
-            <van-icon :name="sub.icon || 'notes-o'" size="24" />
+          <div class="icon-container" :style="{ backgroundColor: getCategoryColor(sub.subCategory) }">
+            <van-icon :name="sub.icon || 'notes-o'" size="24" color="#FFFFFF" />
           </div>
           <span class="item-text">{{ sub.subCategory }}</span>
         </div>
@@ -62,6 +62,25 @@ const emit = defineEmits(['select', 'retry'])
 const categoryStep = ref('main')
 const selectedMainCategory = ref(null)
 const selectedSubCategory = ref(null)
+
+// 分类颜色映射
+const categoryColors = {
+  '饮食': '#F4D06D',
+  '交通': '#4A90E2',
+  '娱乐': '#9B59B6',
+  '购物': '#E67E22',
+  '个人': '#95A5A6',
+  '医疗': '#E74C3C',
+  '家居': '#34495E',
+  '家庭': '#D2B4DE',
+  '生活': '#8EAC58',
+  '学习': '#F39C12'
+}
+
+// 获取分类颜色
+function getCategoryColor(name) {
+  return categoryColors[name] || '#3498DB'
+}
 
 // 当前类型下的所有分类
 const currentTypeCategories = computed(() => {
@@ -152,8 +171,8 @@ function selectSubCategory(sub) {
 
 .grid-container {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
 }
 
 .grid-item {
@@ -165,30 +184,24 @@ function selectSubCategory(sub) {
 }
 
 .icon-container {
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #F5F5F5;
-  border-radius: 8px;
-  color: #D4B16A;
+  border-radius: 12px;
   transition: all 0.2s;
 }
 
 .grid-item.selected .icon-container {
-  background: #E6F7FF;
-  border: 2px solid #1890FF;
-  color: #1890FF;
-}
-
-.back-icon {
-  color: #666666;
+  opacity: 0.7;
+  transform: scale(0.95);
 }
 
 .item-text {
   font-size: 12px;
   color: #333333;
   text-align: center;
+  line-height: 1.2;
 }
 </style>
