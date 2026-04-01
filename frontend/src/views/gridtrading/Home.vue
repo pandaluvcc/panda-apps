@@ -97,6 +97,24 @@ const isMidnightToMarketOpen = () => {
   return totalMinutes >= midnightStart && totalMinutes < marketOpen
 }
 
+// 判断是否在交易时间内（A 股：9:30-11:30，13:00-15:00）
+const isInTradingTime = () => {
+  const now = new Date()
+  const hours = now.getHours()
+  const minutes = now.getMinutes()
+  const totalMinutes = hours * 60 + minutes
+
+  // 上午交易时间：9:30-11:30
+  const morningStart = 9 * 60 + 30
+  const morningEnd = 11 * 60 + 30
+  // 下午交易时间：13:00-15:00
+  const afternoonStart = 13 * 60
+  const afternoonEnd = 15 * 60
+
+  return (totalMinutes >= morningStart && totalMinutes < morningEnd) ||
+    (totalMinutes >= afternoonStart && totalMinutes < afternoonEnd)
+}
+
 // 启动定时刷新
 const startAutoRefresh = () => {
   // 先立即执行一次
