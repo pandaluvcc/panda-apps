@@ -184,4 +184,72 @@ class PositionCalculatorTest {
         // 我们期望保留更多精度
         assertEquals(2, profit.scale()); // 当前实现
     }
+
+    @Test
+    void updateByLastPrice_shouldCalculateTodayProfitAmount() {
+        // Given: 策略有持仓，且设置了昨日收盘价
+        strategy.setId(1L);
+        strategy.setBasePrice(new BigDecimal("10.000"));
+        strategy.setMaxCapital(new BigDecimal("100000.00"));
+        strategy.setLastPrice(new BigDecimal("10.500"));
+        strategy.setPreClosePrice(new BigDecimal("10.000"));
+        strategy.setPosition(new BigDecimal("100"));
+
+        // When
+        positionCalculator.updateByLastPrice(strategy, new BigDecimal("10.500"));
+
+        // Then: 当日涨跌幅金额 = (10.500 - 10.000) * 100 = 50.00
+        assertEquals(new BigDecimal("50.00"), strategy.getTodayProfitAmount());
+    }
+
+    @Test
+    void updateByLastPrice_shouldCalculateNegativeTodayProfitAmount() {
+        // Given: 现价低于昨日收盘价
+        strategy.setId(1L);
+        strategy.setBasePrice(new BigDecimal("10.000"));
+        strategy.setMaxCapital(new BigDecimal("100000.00"));
+        strategy.setLastPrice(new BigDecimal("9.800"));
+        strategy.setPreClosePrice(new BigDecimal("10.000"));
+        strategy.setPosition(new BigDecimal("100"));
+
+        // When
+        positionCalculator.updateByLastPrice(strategy, new BigDecimal("9.800"));
+
+        // Then: 当日涨跌幅金额 = (9.800 - 10.000) * 100 = -20.00
+        assertEquals(new BigDecimal("-20.00"), strategy.getTodayProfitAmount());
+    }
+
+    @Test
+    void updateByLastPrice_shouldSetZeroWhenNoPreClosePrice() {
+        // Given: 策略没有设置昨日收盘价
+        strategy.setId(1L);
+        strategy.setBasePrice(new BigDecimal("10.000"));
+        strategy.setMaxCapital(new BigDecimal("100000.00"));
+        strategy.setLastPrice(new BigDecimal("10.500"));
+        strategy.setPosition(new BigDecimal("100"));
+        // preClosePrice 为 null
+
+        // When
+        positionCalculator.updateByLastPrice(strategy, new BigDecimal("10.500"));
+
+        // Then: 今日涨跌幅金额应为 0
+        assertEquals(BigDecimal.ZERO, strategy.getTodayProfitAmount());
+    }
+
+    @Test
+    void updateByLastPrice_shouldSetZeroWhenNoPosition() {
+        // Given: 策略没有持仓
+        strategy.setId(1L);
+        strategy.setBasePrice(new BigDecimal("10.000"));
+        strategy.setMaxCapital(new BigDecimal("100000.00"));
+        strategy.setLastPrice(new BigDecimal("10.500"));
+        strategy.setPreClosePrice(new BigDecimal("10.000"));
+        strategy.setPosition(BigDecimal.ZERO);
+
+        // When
+        positionCalculator.updateByLastPrice(strategy, new BigDecimal("10.500"));
+
+        // Then: 今日涨跌幅金额应为 0（无持仓）
+        assertEquals(BigDecimal.ZERO, strategy.getTodayProfitAmount());
+    }
 }

@@ -36,9 +36,14 @@
 
       <div class="price-row">
         <span class="current-price">¥{{ formatAmount(marketValue) }}</span>
-        <span class="price-change" :class="priceChangeClass">
-          {{ priceChangeText }}
-        </span>
+        <div class="price-change-wrap">
+          <span class="price-change-amount" :class="priceChangeAmountClass">
+            {{ priceChangeAmountText }}
+          </span>
+          <span class="price-change">
+            {{ priceChangeText }}
+          </span>
+        </div>
       </div>
 
       <div class="stats-row">
@@ -103,6 +108,22 @@ const suggestionsCount = computed(() => {
 
 const marketValue = computed(() => {
   return props.strategy.marketValue || props.strategy.position * (props.strategy.lastPrice || props.strategy.basePrice)
+})
+
+// 涨跌幅金额计算：使用 preClosePrice（昨日收盘价）
+const priceChangeAmountClass = computed(() => {
+  const todayProfitAmount = props.strategy.todayProfitAmount || 0
+  if (todayProfitAmount > 0) return 'up'
+  if (todayProfitAmount < 0) return 'down'
+  return ''
+})
+
+const priceChangeAmountText = computed(() => {
+  const todayProfitAmount = props.strategy.todayProfitAmount || 0
+  if (todayProfitAmount === null || todayProfitAmount === undefined) return '--'
+  const num = Number(todayProfitAmount)
+  const sign = num >= 0 ? '+' : ''
+  return `${sign}${num.toFixed(2)}元`
 })
 
 // 涨跌幅计算：使用 preClosePrice（昨日收盘价）
@@ -260,6 +281,27 @@ const handleDelete = async () => {
   font-weight: 600;
   color: var(--text-primary);
   font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+}
+
+.price-change-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.price-change-amount {
+  font-size: 12px;
+  font-weight: 500;
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+}
+
+.price-change-amount.up {
+  color: var(--profit-positive);
+}
+
+.price-change-amount.down {
+  color: var(--profit-negative);
 }
 
 .price-change {
