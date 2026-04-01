@@ -40,7 +40,7 @@
           <span class="price-change-amount" :class="priceChangeAmountClass">
             {{ priceChangeAmountText }}
           </span>
-          <span class="price-change">
+          <span class="price-change" :class="priceChangeClass">
             {{ priceChangeText }}
           </span>
         </div>
@@ -110,24 +110,49 @@ const marketValue = computed(() => {
   return props.strategy.marketValue || props.strategy.position * (props.strategy.lastPrice || props.strategy.basePrice)
 })
 
+// 判断是否在每日 0 点到开盘前（需要显示--的时间段）
+const isMidnightToMarketOpen = computed(() => {
+  const now = new Date()
+  const hour = now.getHours()
+  const minute = now.getMinutes()
+  const currentMinute = hour * 60 + minute
+
+  // 每日 0:00-9:00（开盘前）
+  const midnightStart = 0 * 60
+  const marketOpen = 9 * 60
+
+  return currentMinute >= midnightStart && currentMinute < marketOpen
+})
+
 // 涨跌幅金额计算：使用 preClosePrice（昨日收盘价）
 const priceChangeAmountClass = computed(() => {
-  const todayProfitAmount = props.strategy.todayProfitAmount || 0
+  if (isMidnightToMarketOpen.value) return ''
+  const lastPrice = props.strategy.lastPrice || 0
+  const preClosePrice = props.strategy.preClosePrice || props.strategy.costPrice || 0
+  const position = props.strategy.position || 0
+  if (preClosePrice === 0) return ''
+  const change = lastPrice - preClosePrice
+  const todayProfitAmount = change * position
   if (todayProfitAmount > 0) return 'up'
   if (todayProfitAmount < 0) return 'down'
   return ''
 })
 
 const priceChangeAmountText = computed(() => {
-  const todayProfitAmount = props.strategy.todayProfitAmount || 0
-  if (todayProfitAmount === null || todayProfitAmount === undefined) return '--'
-  const num = Number(todayProfitAmount)
-  const sign = num >= 0 ? '+' : ''
-  return `${sign}${num.toFixed(2)}元`
+  if (isMidnightToMarketOpen.value) return '--'
+  const lastPrice = props.strategy.lastPrice || 0
+  const preClosePrice = props.strategy.preClosePrice || props.strategy.costPrice || 0
+  const position = props.strategy.position || 0
+  if (preClosePrice === 0) return '--'
+  const change = lastPrice - preClosePrice
+  const todayProfitAmount = change * position
+  const sign = todayProfitAmount >= 0 ? '+' : ''
+  return `${sign}${todayProfitAmount.toFixed(2)}元`
 })
 
 // 涨跌幅计算：使用 preClosePrice（昨日收盘价）
 const priceChangeClass = computed(() => {
+  if (isMidnightToMarketOpen.value) return ''
   const lastPrice = props.strategy.lastPrice || 0
   const preClosePrice = props.strategy.preClosePrice || props.strategy.costPrice || 0
   if (lastPrice > preClosePrice) return 'up'
@@ -136,6 +161,7 @@ const priceChangeClass = computed(() => {
 })
 
 const priceChangeText = computed(() => {
+  if (isMidnightToMarketOpen.value) return '--'
   const lastPrice = props.strategy.lastPrice || 0
   const preClosePrice = props.strategy.preClosePrice || props.strategy.costPrice || 0
   if (preClosePrice === 0) return '--'

@@ -18,6 +18,7 @@
       :total-market-value="strategyStore.totalMarketValue"
       :total-position-profit="strategyStore.totalPositionProfit"
       :today-profit="strategyStore.todayProfit"
+      :is-midnight-to-market-open="isMidnightToMarketOpen()"
     />
 
     <!-- 策略列表 -->
@@ -82,25 +83,18 @@ const { strategyRisks, getRisksForStrategy, fetchRisks } = useStrategyRisks()
 const showBatchUpdateDialog = ref(false)
 const refreshTimer = ref(null)
 
-// 判断是否在交易时间内（工作日 9:30 - 15:02）
-const isInTradingTime = () => {
+// 判断是否在每日 0 点到开盘前（需要显示--的时间段）
+const isMidnightToMarketOpen = () => {
   const now = new Date()
-  const day = now.getDay()
-  // 周末不交易
-  if (day === 0 || day === 6) return false
-
   const hours = now.getHours()
   const minutes = now.getMinutes()
   const totalMinutes = hours * 60 + minutes
 
-  // 上午 9:30 - 11:30，下午 13:00 - 15:02
-  const morningStart = 9 * 60 + 30  // 9:30
-  const morningEnd = 11 * 60 + 30   // 11:30
-  const afternoonStart = 13 * 60    // 13:00
-  const afternoonEnd = 15 * 60 + 2  // 15:02
+  // 每日 0:00-9:00（开盘前）
+  const midnightStart = 0 * 60
+  const marketOpen = 9 * 60
 
-  return (totalMinutes >= morningStart && totalMinutes <= morningEnd) ||
-         (totalMinutes >= afternoonStart && totalMinutes <= afternoonEnd)
+  return totalMinutes >= midnightStart && totalMinutes < marketOpen
 }
 
 // 启动定时刷新

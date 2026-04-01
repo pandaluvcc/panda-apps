@@ -5,6 +5,7 @@
       :total-market-value="totalMarketValue"
       :total-position-profit="totalPositionProfit"
       :today-profit="todayProfit"
+      :is-midnight-to-market-open="isMidnightToMarketOpen"
     />
   </div>
 </template>
@@ -24,6 +25,10 @@ defineProps({
   todayProfit: {
     type: [Number, String],
     default: 0
+  },
+  isMidnightToMarketOpen: {
+    type: Boolean,
+    default: false
   }
 })
 </script>

@@ -20,8 +20,8 @@
       <div class="divider"></div>
       <div class="bottom-item">
         <div class="profit-label">今日盈亏</div>
-        <div class="profit-value" :class="getProfitClass(todayProfit)">
-          {{ formatProfit(todayProfit) }}
+        <div class="profit-value" :class="getProfitClass(displayTodayProfit)">
+          {{ formatProfit(displayTodayProfit) }}
         </div>
       </div>
     </div>
@@ -29,9 +29,9 @@
 </template>
 
 <script setup>
-import { formatAmount } from '@/utils/format'
+import { formatAmount, computed } from 'vue'
 
-defineProps({
+const props = defineProps({
   totalMarketValue: {
     type: [Number, String],
     default: 0
@@ -43,7 +43,16 @@ defineProps({
   todayProfit: {
     type: [Number, String],
     default: 0
+  },
+  isMidnightToMarketOpen: {
+    type: Boolean,
+    default: false
   }
+})
+
+const displayTodayProfit = computed(() => {
+  if (props.isMidnightToMarketOpen) return '--'
+  return props.todayProfit
 })
 
 const formatProfit = (val) => {

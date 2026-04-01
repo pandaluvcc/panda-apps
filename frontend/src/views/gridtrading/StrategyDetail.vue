@@ -203,21 +203,42 @@ const strategyTitle = computed(() => {
   return strategy.value?.name || strategy.value?.symbol || '策略详情'
 })
 
+// 判断是否在每日 0 点到开盘前（需要显示--的时间段）
+const isMidnightToMarketOpen = computed(() => {
+  const now = new Date()
+  const hour = now.getHours()
+  const minute = now.getMinutes()
+  const currentMinute = hour * 60 + minute
+
+  // 每日 0:00-9:00（开盘前）
+  const midnightStart = 0 * 60
+  const marketOpen = 9 * 60
+
+  return currentMinute >= midnightStart && currentMinute < marketOpen
+})
+
 // 计算属性 - 各种统计数据
 const positionProfit = computed(() => strategy.value?.positionProfit || 0)
 const positionProfitPercent = computed(() => {
   const val = strategy.value?.positionProfitPercent || 0
-  // 后端已返回百分比值（如-13.752），无需再乘100
+  // 后端已返回百分比值（如 -13.752），无需再乘 100
   return `${val >= 0 ? '+' : ''}${val.toFixed(3)}%`
 })
 const positionProfitPercentValue = computed(() => strategy.value?.positionProfitPercent || 0)
-const todayProfit = computed(() => strategy.value?.todayProfit || 0)
+const todayProfit = computed(() => {
+  if (isMidnightToMarketOpen.value) return '--'
+  return strategy.value?.todayProfit || 0
+})
 const todayProfitPercent = computed(() => {
+  if (isMidnightToMarketOpen.value) return '--'
   const val = strategy.value?.todayProfitPercent || 0
-  // 后端已返回百分比值，无需再乘100
+  // 后端已返回百分比值，无需再乘 100
   return `${val >= 0 ? '+' : ''}${val.toFixed(3)}%`
 })
-const todayProfitPercentValue = computed(() => strategy.value?.todayProfitPercent || 0)
+const todayProfitPercentValue = computed(() => {
+  if (isMidnightToMarketOpen.value) return 0
+  return strategy.value?.todayProfitPercent || 0
+})
 const holdingDays = computed(() => strategy.value?.holdingDays || 0)
 // 仓位 = 当前策略市值 / 所有策略总市值
 const positionRatio = computed(() => {
@@ -230,6 +251,8 @@ const positionRatio = computed(() => {
 const costPrice = computed(() => strategy.value?.costPrice || 0)
 const totalFee = computed(() => strategy.value?.totalFee || 0)
 const averageBuyPrice = computed(() => strategy.value?.avgBuyPrice || strategy.value?.averageBuyPrice || 0)
+
+// 是否有建议操作
 
 // 是否有建议操作
 const hasSuggestions = computed(() => {
