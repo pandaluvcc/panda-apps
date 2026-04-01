@@ -67,6 +67,40 @@ frontend/
 │   └── styles/         # Global styles (variables.css, reset.css)
 ```
 
+### WeChat Remote Control (Node.js)
+
+```
+wechat-server/
+├── src/
+│   ├── index.js            # Main entry point
+│   ├── config.js           # Configuration
+│   ├── wechat/
+│   │   ├── controller.js   # WeChat message controller
+│   │   ├── validator.js    # Server signature validation
+│   │   └── responder.js    # Message responder
+│   └── cli/
+│       └── listener.js     # CLI process listener
+├── package.json
+└── .env
+```
+
+**Key patterns:**
+- Express.js for HTTP server
+- WeChat Official Account API integration
+- frp/ngrok for reverse tunneling (expose local service)
+- Child process to interact with Claude CLI
+- Signature validation for WeChat server verification
+
+**Setup:**
+```bash
+cd wechat-server
+npm install
+# Configure .env with WeChat credentials
+npm run dev
+```
+
+**Architecture:** WeChat → Backend Server (message receive + forward) → frp → Local CLI Listener → Claude CLI
+
 **Key patterns:**
 - Element Plus (desktop) + Vant (mobile) UI libraries
 - Axios interceptors auto-unpack `ApiResponse` format
@@ -108,6 +142,29 @@ npm run preview
 # Lint and format
 npm run lint
 npm run format
+```
+
+### WeChat Remote Control
+
+```bash
+cd wechat-server
+
+# Development mode
+npm run dev
+
+# Production mode
+npm start
+
+# Install PM2 for production
+npm install -g pm2
+pm2 start src/index.js --name wechat-server
+```
+
+### frp (Reverse Proxy)
+
+```bash
+# Start frp client
+frpc -c wechat-server/frpc.ini
 ```
 
 ### Docker Deployment
@@ -161,6 +218,11 @@ SNAPLEDGER_DB_PASSWORD=your_password
 - `GET/POST /api/snapledger/budget` - Budget management
 - `POST /api/snapledger/ocr` - OCR receipt recognition
 
+### WeChat Remote Control
+- `GET /wechat` - WeChat server verification
+- `POST /wechat` - WeChat message handler
+- `GET /health` - Health check endpoint
+
 ## Key Files to Reference
 
 - `PandaApplication.java` - Main entry, scan base packages
@@ -169,6 +231,9 @@ SNAPLEDGER_DB_PASSWORD=your_password
 - `docker-compose.yml` - Local Docker setup (port 9090, 80)
 - `deploy/docker-compose.yml` - Production setup (server path: /data/docker/platform/)
 - `deploy/default.conf` - Nginx reverse proxy config
+- `wechat-server/src/index.js` - WeChat server main entry
+- `wechat-server/src/wechat/validator.js` - WeChat signature validation
+- `wechat-server/src/cli/listener.js` - CLI process listener
 
 ## UI Design System
 
@@ -193,3 +258,23 @@ Add SQL files to `app-*/src/main/resources/db/migration/` with version prefix (e
 
 ### Adding frontend routes
 Edit `frontend/src/router.js` - routes use module metadata for transition handling.
+
+## Code Style Guidelines
+
+### Java
+
+- **Lombok**: Use `@Data`, `@Builder`, `@NoArgsConstructor`, `@AllArgsConstructor` to reduce boilerplate
+- **Exception Handling**: Use global exception handler with `@RestControllerAdvice`, return `ApiResponse<T>` format
+- **API Response**: All controllers must return `ApiResponse<T>` with code, data, message fields
+- **Entity Naming**: Use plural for repository names (e.g., `StrategyRepository`), singular for entities
+- **DTO Pattern**: Separate DTOs from entities, use MapStruct or manual mapping
+- **Transaction Management**: Use `@Transactional` at service layer, specify rollbackFor = Exception
+
+### Frontend (Vue 3)
+
+- **Composition API**: Use `<script setup>` with `ref`, `reactive`, `computed`, `watch`
+- **State Management**: Use Pinia stores for shared state (not Vuex)
+- **TypeScript**: Prefer TypeScript over JavaScript, define interfaces for props and API responses
+- **Component Structure**: Single-file components with `template` | `script setup` | `style` order
+- **API Clients**: Auto-unpack `ApiResponse.data` via axios interceptors
+- **Styling**: Use CSS variables from `variables.css`, avoid inline styles
