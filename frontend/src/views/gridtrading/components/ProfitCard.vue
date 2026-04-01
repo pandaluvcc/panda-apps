@@ -29,7 +29,8 @@
 </template>
 
 <script setup>
-import { formatAmount, computed } from 'vue'
+import { computed } from 'vue'
+import { formatAmount } from '@/utils/format'
 
 const props = defineProps({
   totalMarketValue: {
