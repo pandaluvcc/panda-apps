@@ -223,6 +223,12 @@ public class Strategy {
     private BigDecimal positionProfitPercent = BigDecimal.ZERO;
 
     /**
+     * 当日涨跌幅金额（现价 - 昨日收盘价）× 持仓数量
+     */
+    @Column(name = "today_profit_amount", precision = 20, scale = 3)
+    private BigDecimal todayProfitAmount = BigDecimal.ZERO;
+
+    /**
      * 个股仓位比例
      */
     @Column(name = "position_ratio", precision = 10, scale = 3)

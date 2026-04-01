@@ -24,7 +24,7 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
     List<Account> findByIsArchivedFalseAndIncludeInTotalTrue();
 
     // 按分组查询
-    List<Account> findByIsArchivedFalseAndAccountGroupOrderByAccountGroupName(@Param("group") String group);
+    List<Account> findByIsArchivedFalseAndAccountGroupOrderByAccountGroup(@Param("group") String group);
 
     // 获取所有未归档账户
     List<Account> findByIsArchivedFalse();

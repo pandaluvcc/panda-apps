@@ -225,6 +225,18 @@ public class PositionCalculator {
 
         log.info("[PositionCalculator] 市值 = {} × {} = {}", newLastPrice, currentPosition, marketValue);
         log.info("[PositionCalculator] 持仓盈亏 = {} - {} = {}", marketValue, netInvestment, positionProfit);
+
+        // 计算当日涨跌幅金额：(现价 - 昨日收盘价) × 持仓数量
+        BigDecimal todayProfitAmount = BigDecimal.ZERO;
+        BigDecimal preClosePrice = strategy.getPreClosePrice();
+        if (preClosePrice != null && preClosePrice.compareTo(BigDecimal.ZERO) > 0) {
+            todayProfitAmount = newLastPrice.subtract(preClosePrice)
+                    .multiply(currentPosition)
+                    .setScale(2, RoundingMode.HALF_UP);
+            strategy.setTodayProfitAmount(todayProfitAmount);
+        }
+
+        log.info("[PositionCalculator] 当日涨跌幅金额 = {}", todayProfitAmount);
         log.info("[PositionCalculator] ===== updateByLastPrice 完成 =====");
 
         strategy.setPositionProfit(positionProfit);
