@@ -1,15 +1,20 @@
 <template>
   <div class="app-home">
-    <!-- 背景装饰 -->
-    <div class="bg-decoration">
-      <div class="bg-circle bg-circle-1"></div>
-      <div class="bg-circle bg-circle-2"></div>
-    </div>
+    <!-- 背景噪点纹理 -->
+    <div class="bg-noise"></div>
 
     <!-- 主内容 -->
     <div class="content">
       <!-- 头部 -->
       <div class="header">
+        <div class="header-icon">
+          <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect class="logo-rect logo-rect-1" x="6" y="6" width="16" height="16" rx="5" fill="#2dd4bf"/>
+            <rect class="logo-rect logo-rect-2" x="30" y="6" width="16" height="16" rx="5" fill="#fb923c"/>
+            <rect class="logo-rect logo-rect-3" x="6" y="30" width="16" height="16" rx="5" fill="#0f766e"/>
+            <rect class="logo-rect logo-rect-4" x="30" y="30" width="16" height="16" rx="5" fill="#c2410c"/>
+          </svg>
+        </div>
         <h1 class="title">Panda Apps</h1>
         <p class="subtitle">我的应用中心</p>
       </div>
@@ -18,36 +23,36 @@
       <div class="app-list">
         <!-- 网格计划 -->
         <div class="app-card" @click="goToApp('/grid')">
-          <div class="app-icon">
-            <el-icon :size="32"><TrendCharts /></el-icon>
+          <div class="app-icon grid-icon">
+            <el-icon :size="28"><TrendCharts /></el-icon>
           </div>
           <div class="app-info">
             <h2 class="app-name">网格计划</h2>
             <p class="app-desc">加密货币网格交易策略管理</p>
           </div>
           <div class="app-arrow">
-            <el-icon><ArrowRight /></el-icon>
+            <el-icon :size="16"><ArrowRight /></el-icon>
           </div>
         </div>
 
         <!-- 快记账 -->
         <div class="app-card" @click="goToApp('/snap/calendar')">
-          <div class="app-icon">
-            <el-icon :size="32"><Wallet /></el-icon>
+          <div class="app-icon snap-icon">
+            <el-icon :size="28"><Wallet /></el-icon>
           </div>
           <div class="app-info">
             <h2 class="app-name">快记账</h2>
             <p class="app-desc">个人账单随手记</p>
           </div>
           <div class="app-arrow">
-            <el-icon><ArrowRight /></el-icon>
+            <el-icon :size="16"><ArrowRight /></el-icon>
           </div>
         </div>
       </div>
 
-      <!-- 底部信息 -->
+      <!-- 底部 -->
       <div class="footer">
-        <p>更多应用开发中...</p>
+        <p>更多应用开发中</p>
       </div>
     </div>
   </div>
@@ -56,14 +61,11 @@
 <script setup>
 import { onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { TrendCharts, ArrowRight, Wallet } from '@element-plus/icons-vue'
 
 const router = useRouter()
 
-// 禁用浏览器滑动手势导航
 const preventSwipeNavigation = (e) => {
-  // 阻止水平滑动触发的浏览器导航
   if (e.touches.length === 1) {
     const touch = e.touches[0]
     const startX = touch.clientX
@@ -72,8 +74,6 @@ const preventSwipeNavigation = (e) => {
     const handleMove = (moveEvent) => {
       const deltaX = moveEvent.touches[0].clientX - startX
       const deltaY = moveEvent.touches[0].clientY - startY
-
-      // 如果水平滑动幅度大于垂直滑动，阻止默认行为
       if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
         moveEvent.preventDefault()
       }
@@ -100,84 +100,26 @@ onUnmounted(() => {
 const goToApp = (path) => {
   router.push(path)
 }
-
-const showComingSoon = () => {
-  ElMessage.info('快记账功能即将上线，敬请期待！')
-}
 </script>
 
 <style scoped>
 .app-home {
   min-height: 100vh;
   position: relative;
-  overflow: hidden;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  /* 禁用水平滑动手势 */
+  background-color: #f8f8f8;
   touch-action: pan-y;
   overscroll-behavior-x: none;
 }
 
-/* 深色模式 */
-@media (prefers-color-scheme: dark) {
-  .app-home {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  }
-
-  .app-card {
-    background: #ffffff;
-  }
-
-  .app-name {
-    color: #1a1a2e;
-  }
-
-  .app-desc {
-    color: #6b7280;
-  }
-
-  .app-arrow {
-    color: #9ca3af;
-  }
-
-  .app-badge {
-    background: #f3f4f6;
-    color: #6b7280;
-  }
-}
-
-/* 背景装饰圆 */
-.bg-decoration {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.bg-circle {
-  position: absolute;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.bg-circle-1 {
-  width: 300px;
-  height: 300px;
-  top: -100px;
-  right: -50px;
-}
-
-.bg-circle-2 {
-  width: 200px;
-  height: 200px;
-  bottom: 100px;
-  left: -80px;
+.bg-noise {
+  display: none;
 }
 
 /* 主内容 */
 .content {
   position: relative;
   z-index: 1;
-  padding: 60px 20px 40px;
+  padding: 72px 24px 48px;
   max-width: 480px;
   margin: 0 auto;
 }
@@ -185,20 +127,51 @@ const showComingSoon = () => {
 /* 头部 */
 .header {
   text-align: center;
-  margin-bottom: 48px;
+  margin-bottom: 52px;
 }
 
+.header-icon {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+@keyframes pop-in {
+  0%   { opacity: 0; transform: scale(0.4); }
+  70%  { transform: scale(1.15); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes bounce-idle {
+  0%, 60%, 100% { transform: translateY(0); }
+  30%            { transform: translateY(-4px); }
+}
+
+.logo-rect {
+  opacity: 0;
+  transform-origin: center;
+  animation:
+    pop-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
+    bounce-idle 2.4s ease-in-out 0.8s infinite;
+}
+
+.logo-rect-1 { animation-delay: 0.05s, 0.8s; }
+.logo-rect-2 { animation-delay: 0.15s, 1.4s; }
+.logo-rect-3 { animation-delay: 0.25s, 1.1s; }
+.logo-rect-4 { animation-delay: 0.35s, 1.7s; }
+
+
 .title {
-  font-size: 32px;
+  font-size: 26px;
   font-weight: 700;
-  color: #ffffff;
-  margin: 0 0 8px;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  color: #1d1c1d;
+  margin: 0 0 6px;
+  letter-spacing: -0.3px;
 }
 
 .subtitle {
-  font-size: 16px;
-  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  color: #616061;
   margin: 0;
 }
 
@@ -206,55 +179,53 @@ const showComingSoon = () => {
 .app-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
-/* 应用卡片 - 白色实心背景 */
+/* 应用卡片 */
 .app-card {
   display: flex;
   align-items: center;
-  padding: 20px;
+  padding: 16px 18px;
   background: #ffffff;
-  border-radius: 20px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
 }
 
 .app-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  background: #ffffff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  border-color: #d1d1d1;
 }
 
 .app-card:active {
-  transform: scale(0.98);
-}
-
-/* 禁用状态卡片 */
-.app-card-disabled {
-  opacity: 0.6;
-}
-
-.app-card-disabled:hover {
-  transform: none;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-}
-
-.app-card-disabled:active {
-  transform: scale(1);
+  transform: scale(0.99);
+  background: #f9f9f9;
 }
 
 /* 应用图标 */
 .app-icon {
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 16px;
-  color: #ffffff;
+  border-radius: 14px;
   flex-shrink: 0;
+}
+
+/* 网格计划 */
+.grid-icon {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+/* 快记账 */
+.snap-icon {
+  background: #fff3e8;
+  color: #c2410c;
 }
 
 /* 应用信息 */
@@ -265,32 +236,23 @@ const showComingSoon = () => {
 }
 
 .app-name {
-  font-size: 18px;
-  font-weight: 600;
-  color: #1a1a2e;
-  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1d1c1d;
+  margin: 0 0 3px;
 }
 
 .app-desc {
-  font-size: 14px;
-  color: #6b7280;
+  font-size: 13px;
+  color: #616061;
   margin: 0;
 }
 
 /* 箭头 */
 .app-arrow {
-  color: #9ca3af;
+  color: #c8c8c8;
   flex-shrink: 0;
-}
-
-/* 徽章 */
-.app-badge {
-  padding: 4px 10px;
-  background: #f3f4f6;
-  border-radius: 12px;
-  font-size: 12px;
-  color: #6b7280;
-  flex-shrink: 0;
+  margin-left: 8px;
 }
 
 /* 底部 */
@@ -300,8 +262,8 @@ const showComingSoon = () => {
 }
 
 .footer p {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  color: #b0b0b0;
   margin: 0;
 }
 </style>
