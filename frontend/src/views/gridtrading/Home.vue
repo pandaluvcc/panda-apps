@@ -184,6 +184,14 @@ const fetchRealtimeQuotes = async () => {
 
     // 重新获取策略数据（包含计算后的最新值）
     await strategyStore.fetchStrategies()
+
+    // 将实时行情中的昨收价写入 store（数据库每日定时更新，实时行情更可靠）
+    for (const strategy of strategyStore.strategies) {
+      const quote = quotes.find(q => q.symbol === strategy.symbol)
+      if (quote?.preClosePrice) {
+        strategy.preClosePrice = quote.preClosePrice
+      }
+    }
   } catch (e) {
     console.log('获取实时行情失败:', e)
     // 行情获取失败不影响页面显示

@@ -58,7 +58,8 @@ public class QuoteScheduler {
             for (Strategy strategy : strategies) {
                 QuoteDTO quote = quoteMap.get(strategy.getSymbol());
                 if (quote != null) {
-                    strategy.setPreClosePrice(quote.getPreClosePrice());
+                    // 15:05 的 currentPrice 即今日收盘价，存为明日的昨收价
+                    strategy.setPreClosePrice(quote.getCurrentPrice());
                     strategy.setLastPrice(quote.getCurrentPrice());
                     positionCalculator.updateByLastPrice(strategy, quote.getCurrentPrice());
                     updated++;

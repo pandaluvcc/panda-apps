@@ -35,7 +35,10 @@
       </div>
 
       <div class="price-row">
-        <span class="current-price">¥{{ formatAmount(marketValue) }}</span>
+        <div class="price-left">
+          <span class="current-price">¥{{ formatAmount(marketValue) }}</span>
+          <span class="pre-close" v-if="strategy.preClosePrice">昨收 ¥{{ formatPrice(strategy.preClosePrice) }}</span>
+        </div>
         <div class="price-change-wrap">
           <span class="price-change-amount" :class="priceChangeAmountClass">
             {{ priceChangeAmountText }}
@@ -302,10 +305,22 @@ const handleDelete = async () => {
   border-bottom: 1px solid var(--border-lighter);
 }
 
+.price-left {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
 .current-price {
   font-size: 20px;
   font-weight: 600;
   color: var(--text-primary);
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+}
+
+.pre-close {
+  font-size: 11px;
+  color: var(--text-secondary);
   font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
 }
 
