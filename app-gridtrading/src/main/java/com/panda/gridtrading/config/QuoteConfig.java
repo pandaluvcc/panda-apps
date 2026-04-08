@@ -1,5 +1,6 @@
 package com.panda.gridtrading.config;
 
+import com.panda.gridtrading.service.quote.provider.EastMoneyQuoteProvider;
 import com.panda.gridtrading.service.quote.provider.QuoteProvider;
 import com.panda.gridtrading.service.quote.provider.SinaQuoteProvider;
 import org.springframework.context.annotation.Bean;
@@ -15,10 +16,10 @@ public class QuoteConfig {
 
     @Bean
     public List<QuoteProvider> quoteProviders() {
-        // 数据源优先级：新浪 > 东方财富 > 腾讯
+        // 数据源优先级：新浪 > 东方财富，新浪失败自动切换到东方财富
         return List.of(
-                new SinaQuoteProvider()
-                // 后续可添加其他 Provider
+                new SinaQuoteProvider(),
+                new EastMoneyQuoteProvider()
         );
     }
 }
