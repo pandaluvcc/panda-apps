@@ -21,9 +21,10 @@
           导入成功！
         </van-notice-bar>
         <van-cell-group inset>
-          <van-cell title="记录数" :value="result.recordCount" />
-          <van-cell title="账户数" :value="result.accountCount" />
-          <van-cell title="分类数" :value="result.categoryCount" />
+          <van-cell title="新增记录" :value="result.recordCount" />
+          <van-cell title="跳过重复" :value="result.skippedCount" />
+          <van-cell title="新增账户" :value="result.accountCount" />
+          <van-cell title="新增分类" :value="result.categoryCount" />
         </van-cell-group>
       </div>
     </div>

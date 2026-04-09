@@ -37,7 +37,7 @@ public class StatsService {
         Map<String, BigDecimal> categoryMap = new HashMap<>();
 
         for (Record record : records) {
-            BigDecimal amount = record.getAmount();
+            BigDecimal amount = record.getAmount().abs();
             if ("收入".equals(record.getRecordType())) {
                 totalIncome = totalIncome.add(amount);
             } else {
@@ -75,7 +75,7 @@ public class StatsService {
         BigDecimal total = BigDecimal.ZERO;
 
         for (Record record : records) {
-            BigDecimal amount = record.getAmount();
+            BigDecimal amount = record.getAmount().abs();
             total = total.add(amount);
             String category = record.getMainCategory();
             if (category != null && !category.isEmpty()) {

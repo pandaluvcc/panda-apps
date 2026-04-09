@@ -17,6 +17,7 @@ import ApkFolderGenerator from '@/views/tools/ApkFolderGenerator.vue'
 // 快记账页面
 import SnapHome from '@/views/snapledger/Home.vue'
 import SnapAddRecord from '@/views/snapledger/AddRecord.vue'
+import SnapAddAccount from '@/views/snapledger/AddAccount.vue'
 import SnapCalendar from '@/views/snapledger/Calendar.vue'
 import SnapImport from '@/views/snapledger/Import.vue'
 import SnapScan from '@/views/snapledger/Scan.vue'
@@ -81,6 +82,12 @@ const routes = [
     path: '/snap/add',
     name: 'SnapAddRecord',
     component: SnapAddRecord,
+    meta: { module: 'snapledger', transition: 'page-slide' }
+  },
+  {
+    path: '/snap/account/add',
+    name: 'SnapAddAccount',
+    component: SnapAddAccount,
     meta: { module: 'snapledger', transition: 'page-slide' }
   },
   {

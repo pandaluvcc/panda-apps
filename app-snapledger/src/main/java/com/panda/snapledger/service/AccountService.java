@@ -12,6 +12,8 @@ import com.panda.snapledger.repository.RecordRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.Sort;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -36,10 +38,11 @@ public class AccountService {
     }
 
     /**
-     * 获取账户列表（排除归档和未纳入总余额的账户）
+     * 获取全部账户（含归档、不纳入总余额的账户）
+     * 过滤逻辑由调用方（前端）按场景自行处理
      */
     public List<AccountDTO> listAccounts() {
-        return accountRepository.findByIsArchivedFalseAndIncludeInTotalTrue().stream()
+        return accountRepository.findAll(Sort.by("accountGroup", "name")).stream()
                 .map(AccountDTO::fromEntity)
                 .collect(Collectors.toList());
     }
@@ -61,17 +64,19 @@ public class AccountService {
         Account account = new Account();
         account.setName(dto.getName());
         account.setAccountGroup(dto.getAccountGroup());
-        account.setMainCurrency(dto.getMainCurrency());
-        account.setInitialBalance(dto.getInitialBalance());
+        account.setMainCurrency(dto.getMainCurrency() != null ? dto.getMainCurrency() : "CNY");
+        BigDecimal initial = dto.getInitialBalance() != null ? dto.getInitialBalance() : BigDecimal.ZERO;
+        account.setInitialBalance(initial);
+        account.setBalance(initial);  // 新建时余额 = 初始余额
         account.setBillCycleStart(dto.getBillCycleStart());
         account.setBillCycleEnd(dto.getBillCycleEnd());
-        account.setIsCreditAccount(dto.getIsCreditAccount());
-        account.setIsMasterAccount(dto.getIsMasterAccount());
-        account.setCashback(dto.getCashback());
-        account.setAutoRollover(dto.getAutoRollover());
-        account.setForeignTransactionFee(dto.getForeignTransactionFee());
-        account.setIncludeInTotal(dto.getIncludeInTotal());
-        account.setShowOnWidget(dto.getShowOnWidget());
+        account.setIsCreditAccount(dto.getIsCreditAccount() != null && dto.getIsCreditAccount());
+        account.setIsMasterAccount(dto.getIsMasterAccount() != null && dto.getIsMasterAccount());
+        account.setCashback(dto.getCashback() != null ? dto.getCashback() : BigDecimal.ZERO);
+        account.setAutoRollover(dto.getAutoRollover() != null && dto.getAutoRollover());
+        account.setForeignTransactionFee(dto.getForeignTransactionFee() != null && dto.getForeignTransactionFee());
+        account.setIncludeInTotal(dto.getIncludeInTotal() == null || dto.getIncludeInTotal());
+        account.setShowOnWidget(dto.getShowOnWidget() == null || dto.getShowOnWidget());
         account.setRemark(dto.getRemark());
 
         Account saved = accountRepository.save(account);

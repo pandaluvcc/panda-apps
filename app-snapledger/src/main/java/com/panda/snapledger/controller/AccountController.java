@@ -37,14 +37,14 @@ public class AccountController {
     }
 
     @PostMapping
+    @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @Operation(summary = "创建账户")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "201", description = "成功创建账户"),
         @ApiResponse(responseCode = "400", description = "请求参数无效")
     })
     public AccountDTO create(@RequestBody AccountDTO dto) {
-        AccountDTO created = accountService.createAccount(dto);
-        return created;
+        return accountService.createAccount(dto);
     }
 
     @PutMapping("/{id}")

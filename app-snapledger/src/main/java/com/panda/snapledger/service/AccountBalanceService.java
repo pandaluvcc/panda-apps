@@ -35,9 +35,9 @@ public class AccountBalanceService {
 
         for (Record record : records) {
             if ("income".equals(record.getRecordType())) {
-                income = income.add(record.getAmount());
+                income = income.add(record.getAmount().abs());
             } else if ("expense".equals(record.getRecordType())) {
-                expense = expense.add(record.getAmount());
+                expense = expense.add(record.getAmount().abs());
             }
         }
 

@@ -28,4 +28,7 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
 
     // 获取所有未归档账户
     List<Account> findByIsArchivedFalse();
+
+    // 检查是否有账户引用了某个分组名
+    boolean existsByAccountGroup(String accountGroup);
 }

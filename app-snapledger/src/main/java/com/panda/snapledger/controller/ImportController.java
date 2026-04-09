@@ -30,6 +30,7 @@ public class ImportController {
         response.put("recordCount", result.getRecordCount());
         response.put("accountCount", result.getAccountCount());
         response.put("categoryCount", result.getCategoryCount());
+        response.put("skippedCount", result.getSkippedCount());
         return response;
     }
 }

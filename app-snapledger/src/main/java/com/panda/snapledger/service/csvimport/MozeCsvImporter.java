@@ -6,6 +6,7 @@ import com.panda.snapledger.domain.Record;
 import com.panda.snapledger.repository.AccountRepository;
 import com.panda.snapledger.repository.CategoryRepository;
 import com.panda.snapledger.repository.RecordRepository;
+import com.panda.snapledger.service.AccountBalanceService;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -25,9 +26,11 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class MozeCsvImporter {
@@ -38,13 +41,16 @@ public class MozeCsvImporter {
     private final RecordRepository recordRepository;
     private final CategoryRepository categoryRepository;
     private final AccountRepository accountRepository;
+    private final AccountBalanceService balanceService;
 
     public MozeCsvImporter(RecordRepository recordRepository,
                           CategoryRepository categoryRepository,
-                          AccountRepository accountRepository) {
+                          AccountRepository accountRepository,
+                          AccountBalanceService balanceService) {
         this.recordRepository = recordRepository;
         this.categoryRepository = categoryRepository;
         this.accountRepository = accountRepository;
+        this.balanceService = balanceService;
     }
 
     public ImportResult importFromCsv(MultipartFile file) throws IOException {
@@ -83,6 +89,18 @@ public class MozeCsvImporter {
 
         log.info("CSV解析完成: {}条记录, {}个账户, {}个分类", records.size(), accounts.size(), categories.size());
 
+        // 过滤重复记录
+        int totalParsed = records.size();
+        records = deduplicateRecords(records);
+        int skippedCount = totalParsed - records.size();
+        if (skippedCount > 0) {
+            log.info("过滤重复记录: {}条（跳过），保留{}条", skippedCount, records.size());
+        }
+
+        if (records.isEmpty()) {
+            return new ImportResult(0, 0, 0, skippedCount);
+        }
+
         // 批量保存账户和分类
         saveAccountsBatch(accounts);
         saveCategoriesBatch(categories);
@@ -90,7 +108,10 @@ public class MozeCsvImporter {
         // 分批保存记录
         int savedCount = saveRecordsBatch(records);
 
-        return new ImportResult(savedCount, accounts.size(), categories.size());
+        // 重新计算所有受影响账户的余额
+        recalculateBalances(accounts);
+
+        return new ImportResult(savedCount, accounts.size(), categories.size(), skippedCount);
     }
 
     @Transactional
@@ -145,6 +166,52 @@ public class MozeCsvImporter {
         }
 
         return totalSaved;
+    }
+
+    /**
+     * 过滤掉数据库中已存在的重复记录
+     * 重复判断依据：date + time + account + amount + recordType 五项完全相同
+     */
+    private List<Record> deduplicateRecords(List<Record> records) {
+        if (records.isEmpty()) return records;
+
+        // 找出 CSV 中的日期范围，只查这段范围内的已有记录
+        LocalDate minDate = records.stream()
+                .map(Record::getDate).min(Comparator.naturalOrder()).get();
+        LocalDate maxDate = records.stream()
+                .map(Record::getDate).max(Comparator.naturalOrder()).get();
+
+        List<Record> existing = recordRepository.findByDateBetweenOrderByDateDescTimeDesc(minDate, maxDate);
+        Set<String> existingFingerprints = existing.stream()
+                .map(this::fingerprint)
+                .collect(Collectors.toSet());
+
+        return records.stream()
+                .filter(r -> !existingFingerprints.contains(fingerprint(r)))
+                .collect(Collectors.toList());
+    }
+
+    /** 生成记录指纹：date|time|account|amount|recordType */
+    private String fingerprint(Record r) {
+        return r.getDate() + "|"
+                + (r.getTime() != null ? r.getTime() : "")  + "|"
+                + (r.getAccount() != null ? r.getAccount() : "") + "|"
+                + (r.getAmount() != null ? r.getAmount().toPlainString() : "") + "|"
+                + (r.getRecordType() != null ? r.getRecordType() : "");
+    }
+
+    @Transactional
+    public void recalculateBalances(Set<String> accountNames) {
+        for (String name : accountNames) {
+            accountRepository.findByName(name).ifPresent(account -> {
+                BigDecimal initial = account.getInitialBalance() != null
+                        ? account.getInitialBalance() : BigDecimal.ZERO;
+                BigDecimal balance = balanceService.calculateBalance(name, initial);
+                account.setBalance(balance);
+                accountRepository.save(account);
+            });
+        }
+        log.info("已重算{}个账户余额", accountNames.size());
     }
 
     private Record parseRecord(CSVRecord csvRecord) {
@@ -266,15 +333,18 @@ public class MozeCsvImporter {
         private final int recordCount;
         private final int accountCount;
         private final int categoryCount;
+        private final int skippedCount;
 
-        public ImportResult(int recordCount, int accountCount, int categoryCount) {
+        public ImportResult(int recordCount, int accountCount, int categoryCount, int skippedCount) {
             this.recordCount = recordCount;
             this.accountCount = accountCount;
             this.categoryCount = categoryCount;
+            this.skippedCount = skippedCount;
         }
 
         public int getRecordCount() { return recordCount; }
         public int getAccountCount() { return accountCount; }
         public int getCategoryCount() { return categoryCount; }
+        public int getSkippedCount() { return skippedCount; }
     }
 }
