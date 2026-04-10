@@ -302,7 +302,7 @@ function fmt(val) {
 }
 
 function getPrevPeriodDates() {
-  if (account.value?.isCreditAccount) {
+  if (account.value?.isCreditAccount && account.value?.billCycleStart) {
     const cycleDay = new Date(account.value.billCycleStart).getDate()
     const s = new Date(periodStart.value)
     let prevYear = s.getFullYear()
