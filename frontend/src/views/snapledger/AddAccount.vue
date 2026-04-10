@@ -187,12 +187,15 @@ const showGroupPicker = ref(false)
 const showCurrencyPicker = ref(false)
 const showBillCyclePicker = ref(false)
 
-const { form, isDirty, validate, toPayload } = useAccountForm()
+const { form, isDirty, validate, toPayload, snapshot } = useAccountForm()
 
 // 默认账单周期为当月
 const now = new Date()
 form.billCycleStart = new Date(now.getFullYear(), now.getMonth(), 1)
 form.billCycleEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+
+// 建立初始快照以确保 isDirty 从 false 开始
+snapshot()
 
 // 账单周期月份选择器值 [year, month]
 const billCycleMonth = ref([
