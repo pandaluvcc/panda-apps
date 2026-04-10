@@ -146,49 +146,85 @@ public class AccountService {
     }
 
     /**
-     * 获取交易明细
+     * 获取账户交易明细（按周期过滤）
+     * 转账记录双向展示；非转账记录只查本账户
      */
-    public List<TransactionDTO> getTransactions(Long accountId) {
+    public List<TransactionDTO> getTransactions(Long accountId, LocalDate startDate, LocalDate endDate) {
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new RuntimeException("账户不存在：" + accountId));
 
-        List<Record> records = recordRepository.findByAccountOrderByDateDescTimeDesc(account.getName());
-        return records.stream()
-                .map(TransactionDTO::fromEntity)
-                .collect(Collectors.toList());
+        List<Record> transfers = recordRepository.findTransfersByAccountOrTargetAndDateBetween(
+                account.getName(), startDate, endDate);
+
+        List<Record> nonTransfers = recordRepository.findNonTransfersByAccountAndDateBetween(
+                account.getName(), startDate, endDate);
+
+        List<Record> all = new java.util.ArrayList<>();
+        all.addAll(transfers);
+        all.addAll(nonTransfers);
+        all.sort(java.util.Comparator
+                .comparing(Record::getDate).reversed()
+                .thenComparing(java.util.Comparator.comparing(
+                        Record::getTime, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder()))));
+
+        return all.stream().map(TransactionDTO::fromEntity).collect(Collectors.toList());
     }
 
     /**
      * 获取周期统计
+     * - 普通账户：本期收入、本期支出、对账笔数
+     * - 信用卡：新增支出、已还金额、对账笔数、remainingDebt（仍需还款，不含上期欠款）
+     * 全部排除 POSTPONED 记录
      */
     public TransactionSummaryDTO getPeriodSummary(Long accountId, LocalDate startDate, LocalDate endDate) {
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new RuntimeException("账户不存在：" + accountId));
 
-        List<Record> records = recordRepository.findByAccountAndDateBetweenAndReconciliationStatusNot(
-            account.getName(), startDate, endDate, Record.RECONCILIATION_POSTPONED);
+        // 非转账记录（排除 POSTPONED）
+        List<Record> nonTransfers = recordRepository.findByAccountAndDateBetweenAndReconciliationStatusNot(
+                account.getName(), startDate, endDate, Record.RECONCILIATION_POSTPONED);
 
         BigDecimal income = BigDecimal.ZERO;
         BigDecimal expense = BigDecimal.ZERO;
         BigDecimal fee = BigDecimal.ZERO;
+        long confirmedCount = 0;
 
-        for (Record record : records) {
-            if ("income".equals(record.getRecordType())) {
-                income = income.add(record.getAmount());
-            } else if ("expense".equals(record.getRecordType())) {
-                expense = expense.add(record.getAmount());
+        for (Record record : nonTransfers) {
+            if ("收入".equals(record.getRecordType())) {
+                income = income.add(record.getAmount().abs());
+            } else if ("支出".equals(record.getRecordType())) {
+                expense = expense.add(record.getAmount().abs());
             }
-            fee = fee.add(record.getFee());
+            if (record.getFee() != null) {
+                fee = fee.add(record.getFee());
+            }
+            if (Record.RECONCILIATION_CONFIRMED.equals(record.getReconciliationStatus())) {
+                confirmedCount++;
+            }
         }
+
+        // 收到的转账（转入本账户），用于已还金额
+        List<Record> incomingTransfers = recordRepository.findIncomingTransfersByTargetAndDateBetweenAndStatusNot(
+                account.getName(), startDate, endDate, Record.RECONCILIATION_POSTPONED);
+        BigDecimal paidAmount = incomingTransfers.stream()
+                .map(r -> r.getAmount().abs())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // remainingDebt = max(0, newExpense - paidAmount)（不含上期欠款，上期欠款由前端额外请求）
+        BigDecimal remainingDebt = expense.subtract(paidAmount).max(BigDecimal.ZERO);
 
         TransactionSummaryDTO summary = new TransactionSummaryDTO();
         summary.setTotalIncome(income);
         summary.setTotalExpense(expense);
         summary.setTotalFee(fee);
         summary.setNetAmount(income.subtract(expense));
-        summary.setRecordCount((long) records.size());
+        summary.setRecordCount((long) nonTransfers.size());
         summary.setPeriodStart(startDate);
         summary.setPeriodEnd(endDate);
+        summary.setNewExpense(expense);
+        summary.setPaidAmount(paidAmount);
+        summary.setConfirmedCount(confirmedCount);
+        summary.setRemainingDebt(remainingDebt);
 
         return summary;
     }

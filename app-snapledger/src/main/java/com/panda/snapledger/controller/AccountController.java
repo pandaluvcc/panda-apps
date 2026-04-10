@@ -76,8 +76,10 @@ public class AccountController {
         @ApiResponse(responseCode = "404", description = "账户不存在")
     })
     public List<TransactionDTO> getTransactions(
-            @Parameter(description = "账户 ID") @PathVariable Long id) {
-        return accountService.getTransactions(id);
+            @Parameter(description = "账户 ID") @PathVariable Long id,
+            @Parameter(description = "开始日期") @RequestParam LocalDate startDate,
+            @Parameter(description = "结束日期") @RequestParam LocalDate endDate) {
+        return accountService.getTransactions(id, startDate, endDate);
     }
 
     @GetMapping("/{id}/summary")
