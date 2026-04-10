@@ -1,7 +1,9 @@
 package com.panda.snapledger.service;
 
 import com.panda.snapledger.controller.dto.RecordDTO;
+import com.panda.snapledger.domain.Account;
 import com.panda.snapledger.domain.Record;
+import com.panda.snapledger.repository.AccountRepository;
 import com.panda.snapledger.repository.RecordRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -10,6 +12,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -18,9 +21,15 @@ import java.util.stream.Collectors;
 public class RecordService {
 
     private final RecordRepository recordRepository;
+    private final AccountRepository accountRepository;
+    private final AccountBalanceService balanceService;
 
-    public RecordService(RecordRepository recordRepository) {
+    public RecordService(RecordRepository recordRepository,
+                         AccountRepository accountRepository,
+                         AccountBalanceService balanceService) {
         this.recordRepository = recordRepository;
+        this.accountRepository = accountRepository;
+        this.balanceService = balanceService;
     }
 
     public List<RecordDTO> findByDate(LocalDate date) {
@@ -53,6 +62,7 @@ public class RecordService {
             record.setDate(LocalDate.now());
         }
         Record saved = recordRepository.save(record);
+        refreshBalance(saved.getAccount());
         return RecordDTO.fromEntity(saved);
     }
 
@@ -60,6 +70,7 @@ public class RecordService {
     public RecordDTO update(Long id, RecordDTO dto) {
         Record record = recordRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("记录不存在: " + id));
+        String oldAccount = record.getAccount();
         record.setAccount(dto.getAccount());
         record.setCurrency(dto.getCurrency());
         record.setRecordType(dto.getRecordType());
@@ -77,11 +88,32 @@ public class RecordService {
         record.setDescription(dto.getDescription());
         record.setTags(dto.getTags());
         record.setTarget(dto.getTarget());
-        return RecordDTO.fromEntity(recordRepository.save(record));
+        RecordDTO result = RecordDTO.fromEntity(recordRepository.save(record));
+        // 账户名变更时，新旧账户都要刷新
+        refreshBalance(oldAccount);
+        if (!oldAccount.equals(dto.getAccount())) {
+            refreshBalance(dto.getAccount());
+        }
+        return result;
     }
 
     @Transactional
     public void delete(Long id) {
-        recordRepository.deleteById(id);
+        Record record = recordRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("记录不存在: " + id));
+        String accountName = record.getAccount();
+        recordRepository.delete(record);
+        refreshBalance(accountName);
+    }
+
+    /** 重算并持久化指定账户余额，账户不存在时静默跳过 */
+    private void refreshBalance(String accountName) {
+        if (accountName == null || accountName.isBlank()) return;
+        accountRepository.findByName(accountName).ifPresent(account -> {
+            BigDecimal initial = account.getInitialBalance() != null
+                    ? account.getInitialBalance() : BigDecimal.ZERO;
+            account.setBalance(balanceService.calculateBalance(accountName, initial));
+            accountRepository.save(account);
+        });
     }
 }

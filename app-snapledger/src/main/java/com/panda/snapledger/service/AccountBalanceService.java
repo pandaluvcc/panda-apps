@@ -34,9 +34,9 @@ public class AccountBalanceService {
         BigDecimal expense = BigDecimal.ZERO;
 
         for (Record record : records) {
-            if ("income".equals(record.getRecordType())) {
+            if ("收入".equals(record.getRecordType())) {
                 income = income.add(record.getAmount().abs());
-            } else if ("expense".equals(record.getRecordType())) {
+            } else if ("支出".equals(record.getRecordType())) {
                 expense = expense.add(record.getAmount().abs());
             }
         }
