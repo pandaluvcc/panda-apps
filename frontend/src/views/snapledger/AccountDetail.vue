@@ -104,7 +104,7 @@
               </div>
               <div class="record-right">
                 <div class="record-amount">￥{{ fmt(tx.amount) }}</div>
-                <span class="tag tag-transfer">还款</span>
+                <span class="tag tag-transfer">{{ tx.target === account?.name ? '还款' : '转出' }}</span>
               </div>
             </div>
           </template>
@@ -152,7 +152,7 @@
       </template>
 
       <!-- 账户信息 tab -->
-      <template v-if="activeTab === '账户信息'">
+      <template v-else-if="activeTab === '账户信息'">
         <div class="info-form">
           <div class="form-section">
             <div class="form-item">
@@ -259,7 +259,7 @@ function computeDefaultPeriod(acc) {
 }
 
 function shiftPeriod(dir) {
-  if (account.value?.isCreditAccount) {
+  if (account.value?.isCreditAccount && account.value?.billCycleStart) {
     // Reconstruct from cycleDay to avoid month-overflow (e.g., Jan 31 + 1 month ≠ Feb 31)
     const cycleDay = new Date(account.value.billCycleStart).getDate()
     const s = new Date(periodStart.value)
@@ -341,6 +341,8 @@ async function loadStats() {
       const prev = getPrevPeriodDates()
       prevSummary.value = await getAccountSummary(id, prev.start, prev.end)
     }
+  } catch {
+    showToast('统计数据加载失败')
   } finally {
     statsLoading.value = false
   }
@@ -349,7 +351,6 @@ async function loadStats() {
 // Transactions
 const transfers = ref([])
 const nonTransfers = ref([])
-const txLoading = ref(false)
 const sortDesc = ref(true)
 
 const sortedNonTransfers = computed(() => {
@@ -360,13 +361,12 @@ const sortedNonTransfers = computed(() => {
 
 async function loadTransactions() {
   if (!account.value || !periodStart.value) return
-  txLoading.value = true
   try {
     const all = await getAccountTransactions(route.params.id, periodStart.value, periodEnd.value)
     transfers.value = all.filter(r => r.recordType === '转账')
     nonTransfers.value = all.filter(r => r.recordType !== '转账')
-  } finally {
-    txLoading.value = false
+  } catch {
+    showToast('记录加载失败')
   }
 }
 
@@ -397,6 +397,10 @@ async function saveAccountInfo() {
     showToast('保存成功')
     account.value = await getAccount(route.params.id)
     loadFromAccount(account.value)
+    // Re-compute period in case isCreditAccount or billCycleStart changed
+    const { start, end } = computeDefaultPeriod(account.value)
+    periodStart.value = start
+    periodEnd.value = end
   } catch (e) {
     showToast('保存失败: ' + (e.message || e))
   } finally {
@@ -420,11 +424,15 @@ async function handleBack() {
 }
 
 onMounted(async () => {
-  account.value = await getAccount(route.params.id)
-  const { start, end } = computeDefaultPeriod(account.value)
-  periodStart.value = start
-  periodEnd.value = end
-  await Promise.all([loadStats(), loadTransactions()])
+  try {
+    account.value = await getAccount(route.params.id)
+    const { start, end } = computeDefaultPeriod(account.value)
+    periodStart.value = start
+    periodEnd.value = end
+    await Promise.all([loadStats(), loadTransactions()])
+  } catch {
+    showToast('加载失败，请返回重试')
+  }
 })
 </script>
 
