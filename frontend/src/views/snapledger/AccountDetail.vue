@@ -27,9 +27,9 @@
       <template v-if="activeTab === '交易明细'">
         <!-- Period navigation -->
         <div class="period-nav">
-          <button class="period-arrow" @click="shiftPeriod(-1)">‹</button>
-          <span class="period-label">{{ periodLabel }}</span>
-          <button class="period-arrow" @click="shiftPeriod(1)">›</button>
+          <button class="period-arrow" @click.stop="shiftPeriod(-1)">‹</button>
+          <span class="period-label period-label--clickable" @click="openPeriodPicker">{{ periodLabel }}</span>
+          <button class="period-arrow" @click.stop="shiftPeriod(1)">›</button>
         </div>
 
         <!-- Stats section -->
@@ -37,7 +37,7 @@
           <template v-if="account?.isCreditAccount">
             <div class="stat-row">
               <span class="stat-label">新增支出</span>
-              <span class="stat-value">￥{{ fmt(summary.newExpense) }}</span>
+              <span class="stat-value">-￥{{ fmt(summary.newExpense) }}</span>
             </div>
             <div class="stat-row">
               <span class="stat-label">上期欠款</span>
@@ -57,7 +57,7 @@
             </div>
             <div class="stat-row">
               <span class="stat-label">对账笔数</span>
-              <span class="stat-value">{{ summary.confirmedCount ?? 0 }}</span>
+              <span class="stat-value">{{ (summary.confirmedCount ?? 0) }} / {{ totalRecordCount }}</span>
             </div>
             <div class="stat-row stat-row--highlight">
               <span class="stat-label">仍需还款</span>
@@ -76,7 +76,7 @@
             </div>
             <div class="stat-row">
               <span class="stat-label">对账笔数</span>
-              <span class="stat-value">{{ summary.confirmedCount ?? 0 }}</span>
+              <span class="stat-value">{{ (summary.confirmedCount ?? 0) }} / {{ totalRecordCount }}</span>
             </div>
           </template>
         </div>
@@ -84,13 +84,13 @@
           <van-loading color="#999" size="18" />
         </div>
 
-        <!-- Transfer records -->
+        <!-- Repayment records -->
         <div class="section-card">
           <div class="section-header">
-            <span class="section-title">转账记录（{{ transfers.length }}）</span>
+            <span class="section-title">还款记录（{{ transfers.length }}）</span>
             <button class="add-btn" @click="goAddRecord('转账')">+</button>
           </div>
-          <div v-if="transfers.length === 0" class="empty-tip">本周期暂无转账记录</div>
+          <div v-if="transfers.length === 0" class="empty-tip">本周期暂无还款记录</div>
           <template v-else>
             <div v-for="tx in transfers" :key="tx.id" class="record-row">
               <div class="record-icon">
@@ -218,6 +218,17 @@
       </template>
     </div>
   </div>
+
+  <!-- 账单周期跳转选择器 -->
+  <van-popup v-model:show="showPeriodPicker" position="bottom" round>
+    <van-picker
+      v-model="periodPickerValue"
+      :columns="periodPickerColumns"
+      title="选择账单周期"
+      @confirm="onPeriodPickerConfirm"
+      @cancel="showPeriodPicker = false"
+    />
+  </van-popup>
 
   <!-- 账单周期起始日选择器 -->
   <van-popup v-model:show="showBillCyclePicker" position="bottom" round>
@@ -383,16 +394,21 @@ const sortedNonTransfers = computed(() => {
   return list
 })
 
+// 还款记录：包含"转账"和 Moze 导出的"还款"类型
+const REPAYMENT_TYPES = new Set(['转账', '还款'])
+
 async function loadTransactions() {
   if (!account.value || !periodStart.value) return
   try {
     const all = await getAccountTransactions(route.params.id, periodStart.value, periodEnd.value)
-    transfers.value = all.filter(r => r.recordType === '转账')
-    nonTransfers.value = all.filter(r => r.recordType !== '转账')
+    transfers.value = all.filter(r => REPAYMENT_TYPES.has(r.recordType))
+    nonTransfers.value = all.filter(r => !REPAYMENT_TYPES.has(r.recordType))
   } catch {
     showToast('记录加载失败')
   }
 }
+
+const totalRecordCount = computed(() => transfers.value.length + nonTransfers.value.length)
 
 function goAddRecord(type) {
   router.push({ path: '/snap/add', query: { accountId: route.params.id, type } })
@@ -403,6 +419,52 @@ watch([periodStart, periodEnd], () => {
   loadStats()
   loadTransactions()
 })
+
+// 账单周期选择器（点击日期区间弹出）
+const showPeriodPicker = ref(false)
+const periodPickerValue = ref([])
+
+const periodPickerColumns = computed(() => {
+  if (!account.value || !periodStart.value) return []
+  const periods = []
+  const isCreditWithCycle = account.value.isCreditAccount && account.value.billCycleStart
+  const cycleDay = isCreditWithCycle ? parseCycleDay(account.value.billCycleStart) : null
+  const base = new Date(periodStart.value)
+
+  // 生成从 +11 到 -24 月的区间（newest first）
+  for (let offset = 11; offset >= -24; offset--) {
+    let start, end
+    if (isCreditWithCycle) {
+      let y = base.getFullYear()
+      let m = base.getMonth() + offset
+      while (m < 0) { m += 12; y -= 1 }
+      while (m > 11) { m -= 12; y += 1 }
+      const d = cyclePeriodDates(y, m, cycleDay)
+      start = d.start; end = d.end
+    } else {
+      const d = new Date(base.getFullYear(), base.getMonth() + offset, 1)
+      start = formatDate(new Date(d.getFullYear(), d.getMonth(), 1))
+      end = formatDate(new Date(d.getFullYear(), d.getMonth() + 1, 0))
+    }
+    periods.push({
+      text: `${start.replace(/-/g, '/')} - ${end.replace(/-/g, '/')}`,
+      value: `${start}|${end}`
+    })
+  }
+  return periods
+})
+
+function openPeriodPicker() {
+  periodPickerValue.value = [`${periodStart.value}|${periodEnd.value}`]
+  showPeriodPicker.value = true
+}
+
+function onPeriodPickerConfirm({ selectedValues }) {
+  const [start, end] = selectedValues[0].split('|')
+  periodStart.value = start
+  periodEnd.value = end
+  showPeriodPicker.value = false
+}
 
 // Account info form
 const { form: infoForm, isDirty, loadFromAccount, toPayload, validate } = useAccountForm()
@@ -554,6 +616,7 @@ onMounted(async () => {
   background: none; border: none; cursor: pointer; padding: 4px 8px;
 }
 .period-label { font-size: 15px; font-weight: 500; min-width: 160px; text-align: center; }
+.period-label--clickable { cursor: pointer; color: #1989fa; }
 .stats-card {
   background: #fff; margin: 0 12px 12px; border-radius: 12px; padding: 4px 0;
 }
