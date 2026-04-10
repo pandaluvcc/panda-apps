@@ -56,4 +56,33 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
 
     // 按账户查询（按日期时间倒序）
     List<Record> findByAccountOrderByDateDescTimeDesc(String account);
+
+    // 双向查询转账记录（转出 + 转入），按日期时间倒序
+    @Query("SELECT r FROM Record r WHERE (r.account = :account OR r.target = :account) " +
+           "AND r.date BETWEEN :start AND :end AND r.recordType = '转账' " +
+           "ORDER BY r.date DESC, r.time DESC")
+    List<Record> findTransfersByAccountOrTargetAndDateBetween(
+            @Param("account") String account,
+            @Param("start") LocalDate start,
+            @Param("end") LocalDate end);
+
+    // 查询非转账记录（按账户和日期范围）
+    @Query("SELECT r FROM Record r WHERE r.account = :account " +
+           "AND r.date BETWEEN :start AND :end AND r.recordType != '转账' " +
+           "ORDER BY r.date DESC, r.time DESC")
+    List<Record> findNonTransfersByAccountAndDateBetween(
+            @Param("account") String account,
+            @Param("start") LocalDate start,
+            @Param("end") LocalDate end);
+
+    // 查询收到的转账（target=本账户），排除 POSTPONED，用于计算已还金额
+    @Query("SELECT r FROM Record r WHERE r.target = :account " +
+           "AND r.date BETWEEN :start AND :end AND r.recordType = '转账' " +
+           "AND r.reconciliationStatus != :status " +
+           "ORDER BY r.date DESC, r.time DESC")
+    List<Record> findIncomingTransfersByTargetAndDateBetweenAndStatusNot(
+            @Param("account") String account,
+            @Param("start") LocalDate start,
+            @Param("end") LocalDate end,
+            @Param("status") String status);
 }
