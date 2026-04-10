@@ -177,6 +177,7 @@ import { useRouter } from 'vue-router'
 import { createAccount } from '@/api'
 import { showToast, showConfirmDialog } from 'vant'
 import AccountGroupPicker from '@/components/snapledger/AccountGroupPicker.vue'
+import { useAccountForm } from '@/composables/useAccountForm'
 
 const router = useRouter()
 const saving = ref(false)
@@ -186,24 +187,12 @@ const showGroupPicker = ref(false)
 const showCurrencyPicker = ref(false)
 const showBillCyclePicker = ref(false)
 
+const { form, isDirty, validate, toPayload } = useAccountForm()
+
 // 默认账单周期为当月
 const now = new Date()
-const defaultBillStart = new Date(now.getFullYear(), now.getMonth(), 1)
-const defaultBillEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-
-const form = ref({
-  name: '',
-  mainCurrency: 'CNY',
-  accountGroup: '第三方支付',
-  initialBalance: 0,
-  billCycleStart: defaultBillStart,
-  billCycleEnd: defaultBillEnd,
-  isCreditAccount: false,
-  autoRollover: false,
-  foreignTransactionFee: false,
-  includeInTotal: true,
-  remark: ''
-})
+form.billCycleStart = new Date(now.getFullYear(), now.getMonth(), 1)
+form.billCycleEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0)
 
 // 账单周期月份选择器值 [year, month]
 const billCycleMonth = ref([
@@ -212,8 +201,8 @@ const billCycleMonth = ref([
 ])
 
 const billCycleDisplay = computed(() => {
-  const s = form.value.billCycleStart
-  const e = form.value.billCycleEnd
+  const s = form.billCycleStart
+  const e = form.billCycleEnd
   if (!s || !e) return '未设置'
   const fmt = (d) => `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`
   return `${fmt(s)} — ${fmt(e)}`
@@ -234,20 +223,21 @@ function focusNameInput() {
 }
 
 function onCurrencyConfirm({ selectedOptions }) {
-  form.value.mainCurrency = selectedOptions[0].value
+  form.mainCurrency = selectedOptions[0].value
   showCurrencyPicker.value = false
 }
 
 function onBillCycleConfirm({ selectedValues }) {
   const [year, month] = selectedValues.map(Number)
-  form.value.billCycleStart = new Date(year, month - 1, 1)
-  form.value.billCycleEnd   = new Date(year, month, 0)
+  form.billCycleStart = new Date(year, month - 1, 1)
+  form.billCycleEnd   = new Date(year, month, 0)
   showBillCyclePicker.value = false
 }
 
 async function save() {
-  if (!form.value.name?.trim()) {
-    showToast('请填写账户名称')
+  const validationError = validate()
+  if (validationError) {
+    showToast(validationError)
     focusNameInput()
     return
   }
@@ -255,11 +245,11 @@ async function save() {
   saving.value = true
   try {
     const payload = {
-      ...form.value,
-      name: form.value.name.trim(),
-      balance: form.value.initialBalance || 0,
-      billCycleStart: form.value.billCycleStart?.toISOString().slice(0, 10),
-      billCycleEnd:   form.value.billCycleEnd?.toISOString().slice(0, 10),
+      ...toPayload(),
+      name: form.name.trim(),
+      balance: form.initialBalance || 0,
+      billCycleStart: form.billCycleStart?.toISOString().slice(0, 10),
+      billCycleEnd:   form.billCycleEnd?.toISOString().slice(0, 10),
     }
     await createAccount(payload)
     showToast({ message: '账户已创建', type: 'success' })
@@ -273,8 +263,7 @@ async function save() {
 }
 
 async function handleCancel() {
-  const hasInput = form.value.name.trim() || form.value.remark.trim()
-  if (hasInput) {
+  if (isDirty.value) {
     try {
       await showConfirmDialog({ title: '提示', message: '确定放弃当前填写内容？' })
       router.back()
