@@ -17,7 +17,7 @@ export function useAccountForm() {
   })
 
   // Track original values to detect unsaved changes
-  const originalJson = ref('')
+  const originalJson = ref(JSON.stringify(form))
   const isDirty = computed(() => JSON.stringify(form) !== originalJson.value)
 
   function snapshot() {
@@ -45,8 +45,12 @@ export function useAccountForm() {
       mainCurrency: form.mainCurrency,
       accountGroup: form.accountGroup,
       initialBalance: Number(form.initialBalance),
-      billCycleStart: form.billCycleStart,
-      billCycleEnd: form.billCycleEnd,
+      billCycleStart: form.billCycleStart instanceof Date
+        ? form.billCycleStart.toISOString().slice(0, 10)
+        : form.billCycleStart || null,
+      billCycleEnd: form.billCycleEnd instanceof Date
+        ? form.billCycleEnd.toISOString().slice(0, 10)
+        : form.billCycleEnd || null,
       isCreditAccount: form.isCreditAccount,
       autoRollover: form.autoRollover,
       foreignTransactionFee: form.foreignTransactionFee,

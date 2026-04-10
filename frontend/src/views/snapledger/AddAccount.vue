@@ -251,8 +251,6 @@ async function save() {
       ...toPayload(),
       name: form.name.trim(),
       balance: form.initialBalance || 0,
-      billCycleStart: form.billCycleStart?.toISOString().slice(0, 10),
-      billCycleEnd:   form.billCycleEnd?.toISOString().slice(0, 10),
     }
     await createAccount(payload)
     showToast({ message: '账户已创建', type: 'success' })
