@@ -412,9 +412,14 @@ async function loadRecord() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   loadCategories()
-  loadAccounts()
+  await loadAccounts()
+  // Pre-fill account when navigated from Account Detail page (?accountId=:id)
+  if (route.query.accountId) {
+    const acc = accounts.value.find(a => String(a.id) === String(route.query.accountId))
+    if (acc) form.value.account = acc.name
+  }
   loadRecord()
 })
 </script>

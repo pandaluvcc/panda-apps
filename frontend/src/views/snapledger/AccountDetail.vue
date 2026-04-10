@@ -238,19 +238,34 @@ function formatDate(date) {
   return `${y}-${m}-${d}`
 }
 
+// Parse day-of-month from ISO string without UTC timezone shift (new Date("2024-01-15") → UTC midnight)
+function parseCycleDay(dateStr) {
+  return parseInt(dateStr.split('-')[2], 10)
+}
+
+// Build billing cycle start/end dates, clamping cycleDay to the last valid day if the
+// target month is shorter (e.g., cycleDay=31 in February → Feb 28/29)
+function cyclePeriodDates(year, month, cycleDay) {
+  const daysInStart = new Date(year, month + 1, 0).getDate()
+  const start = new Date(year, month, Math.min(cycleDay, daysInStart))
+  const endRaw = cycleDay - 1
+  const end = endRaw <= 0
+    ? new Date(year, month + 1, 0)   // cycleDay=1 → last day of this month
+    : new Date(year, month + 1, Math.min(endRaw, new Date(year, month + 2, 0).getDate()))
+  return { start: formatDate(start), end: formatDate(end) }
+}
+
 function computeDefaultPeriod(acc) {
   const today = new Date()
   if (acc.isCreditAccount && acc.billCycleStart) {
-    const cycleDay = new Date(acc.billCycleStart).getDate()
+    const cycleDay = parseCycleDay(acc.billCycleStart)
     let y = today.getFullYear()
     let m = today.getMonth()
     if (today.getDate() < cycleDay) {
       m -= 1
       if (m < 0) { m = 11; y -= 1 }
     }
-    const start = new Date(y, m, cycleDay)
-    const end = new Date(y, m + 1, cycleDay - 1)
-    return { start: formatDate(start), end: formatDate(end) }
+    return cyclePeriodDates(y, m, cycleDay)
   } else {
     const start = new Date(today.getFullYear(), today.getMonth(), 1)
     const end = new Date(today.getFullYear(), today.getMonth() + 1, 0)
@@ -260,17 +275,15 @@ function computeDefaultPeriod(acc) {
 
 function shiftPeriod(dir) {
   if (account.value?.isCreditAccount && account.value?.billCycleStart) {
-    // Reconstruct from cycleDay to avoid month-overflow (e.g., Jan 31 + 1 month ≠ Feb 31)
-    const cycleDay = new Date(account.value.billCycleStart).getDate()
+    const cycleDay = parseCycleDay(account.value.billCycleStart)
     const s = new Date(periodStart.value)
     let newYear = s.getFullYear()
     let newMonth = s.getMonth() + dir
     if (newMonth < 0) { newMonth += 12; newYear -= 1 }
     if (newMonth > 11) { newMonth -= 12; newYear += 1 }
-    const newStart = new Date(newYear, newMonth, cycleDay)
-    const newEnd = new Date(newYear, newMonth + 1, cycleDay - 1)
-    periodStart.value = formatDate(newStart)
-    periodEnd.value = formatDate(newEnd)
+    const { start, end } = cyclePeriodDates(newYear, newMonth, cycleDay)
+    periodStart.value = start
+    periodEnd.value = end
   } else {
     const s = new Date(periodStart.value)
     s.setMonth(s.getMonth() + dir)
@@ -303,14 +316,12 @@ function fmt(val) {
 
 function getPrevPeriodDates() {
   if (account.value?.isCreditAccount && account.value?.billCycleStart) {
-    const cycleDay = new Date(account.value.billCycleStart).getDate()
+    const cycleDay = parseCycleDay(account.value.billCycleStart)
     const s = new Date(periodStart.value)
     let prevYear = s.getFullYear()
     let prevMonth = s.getMonth() - 1
     if (prevMonth < 0) { prevMonth = 11; prevYear -= 1 }
-    const prevStart = new Date(prevYear, prevMonth, cycleDay)
-    const prevEnd = new Date(prevYear, prevMonth + 1, cycleDay - 1)
-    return { start: formatDate(prevStart), end: formatDate(prevEnd) }
+    return cyclePeriodDates(prevYear, prevMonth, cycleDay)
   } else {
     const s = new Date(periodStart.value)
     const prevStart = new Date(s.getFullYear(), s.getMonth() - 1, 1)
