@@ -23,6 +23,7 @@ import SnapImport from '@/views/snapledger/Import.vue'
 import SnapScan from '@/views/snapledger/Scan.vue'
 import SnapStats from '@/views/snapledger/Stats.vue'
 import SnapBudget from '@/views/snapledger/Budget.vue'
+import SnapAccountDetail from '@/views/snapledger/AccountDetail.vue'
 
 const routes = [
   // 根路由 - 应用首页
@@ -93,7 +94,7 @@ const routes = [
   {
     path: '/snap/account/:id',
     name: 'SnapAccountDetail',
-    component: () => import('@/views/snapledger/AccountDetail.vue'),
+    component: SnapAccountDetail,
     meta: { module: 'snapledger', transition: 'page-slide' }
   },
   {
