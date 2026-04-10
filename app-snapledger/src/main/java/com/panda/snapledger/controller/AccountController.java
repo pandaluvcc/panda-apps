@@ -36,6 +36,16 @@ public class AccountController {
         return accountService.listAccounts();
     }
 
+    @GetMapping("/{id}")
+    @Operation(summary = "获取账户详情")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "成功获取账户"),
+        @ApiResponse(responseCode = "404", description = "账户不存在")
+    })
+    public AccountDTO getById(@Parameter(description = "账户 ID") @PathVariable Long id) {
+        return accountService.getAccount(id);
+    }
+
     @PostMapping
     @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @Operation(summary = "创建账户")
