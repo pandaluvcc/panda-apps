@@ -28,6 +28,9 @@ public class TransactionDTO {
     private String reconciliationStatus;
     private Boolean isPostponed;
     private String postponedToCycle;
+    private String account;   // 来源账户名
+    private String target;    // 目标账户名（转账）
+    private String project;   // 项目标签
 
     public static TransactionDTO fromEntity(Record record) {
         TransactionDTO dto = new TransactionDTO();
@@ -46,6 +49,9 @@ public class TransactionDTO {
         dto.setReconciliationStatus(record.getReconciliationStatus());
         dto.setIsPostponed("POSTPONED".equals(record.getReconciliationStatus()));
         dto.setPostponedToCycle(record.getPostponedToCycle());
+        dto.setAccount(record.getAccount());
+        dto.setTarget(record.getTarget());
+        dto.setProject(record.getProject());
         return dto;
     }
 }
