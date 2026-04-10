@@ -171,6 +171,13 @@
               <span class="form-label">初始余额</span>
               <input v-model.number="infoForm.initialBalance" class="form-input" type="number" placeholder="0" />
             </div>
+            <div class="form-item form-item--picker" @click="openBillCyclePicker">
+              <span class="form-label">账单周期</span>
+              <div class="form-picker-value">
+                <span>{{ billCycleInfoDisplay }}</span>
+                <span class="picker-arrow">›</span>
+              </div>
+            </div>
           </div>
 
           <div class="form-section">
@@ -211,6 +218,17 @@
       </template>
     </div>
   </div>
+
+  <!-- 账单周期起始日选择器 -->
+  <van-popup v-model:show="showBillCyclePicker" position="bottom" round>
+    <van-picker
+      v-model="billCyclePickerDay"
+      :columns="billCycleDayColumns"
+      title="账单起始日"
+      @confirm="onBillCycleDayConfirm"
+      @cancel="showBillCyclePicker = false"
+    />
+  </van-popup>
 </template>
 
 <script setup>
@@ -395,6 +413,49 @@ watch([periodStart, periodEnd], () => {
 const { form: infoForm, isDirty, loadFromAccount, toPayload, validate } = useAccountForm()
 const saving = ref(false)
 
+// 账单周期选择器
+const showBillCyclePicker = ref(false)
+const billCyclePickerDay = ref(['01'])
+
+// 从 billCycleStart 字符串或 Date 中提取日（天）
+function getCycleDayFromForm() {
+  const raw = infoForm.billCycleStart
+  if (!raw) return null
+  const str = raw instanceof Date ? raw.toISOString().slice(0, 10) : raw
+  return parseInt(str.split('-')[2], 10)
+}
+
+const billCycleInfoDisplay = computed(() => {
+  const day = getCycleDayFromForm()
+  if (!day) return '未设置'
+  const endDay = day <= 1 ? 28 : day - 1
+  return `每月${day}日 — 次月${endDay}日`
+})
+
+const billCycleDayColumns = Array.from({ length: 28 }, (_, i) => ({
+  text: `${i + 1}日`,
+  value: String(i + 1).padStart(2, '0')
+}))
+
+function openBillCyclePicker() {
+  const day = getCycleDayFromForm()
+  billCyclePickerDay.value = [String(Math.min(day || 1, 28)).padStart(2, '0')]
+  showBillCyclePicker.value = true
+}
+
+function onBillCycleDayConfirm({ selectedValues }) {
+  const day = parseInt(selectedValues[0], 10)
+  const now = new Date()
+  const pad = d => String(d).padStart(2, '0')
+  infoForm.billCycleStart = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(day)}`
+  const endDay = day <= 1 ? 28 : day - 1
+  let endMonth = now.getMonth() + 2
+  let endYear = now.getFullYear()
+  if (endMonth > 12) { endMonth = 1; endYear += 1 }
+  infoForm.billCycleEnd = `${endYear}-${pad(endMonth)}-${pad(endDay)}`
+  showBillCyclePicker.value = false
+}
+
 watch(account, (acc) => {
   if (acc) loadFromAccount(acc)
 }, { immediate: true })
@@ -570,4 +631,10 @@ onMounted(async () => {
   font-size: 14px; color: #333; background: transparent;
 }
 .save-area { padding: 8px 0 24px; }
+.form-item--picker { cursor: pointer; }
+.form-picker-value {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 14px; color: #666;
+}
+.picker-arrow { color: #bbb; font-size: 16px; }
 </style>
