@@ -314,12 +314,7 @@ function shiftPeriod(dir) {
 
 const periodLabel = computed(() => {
   if (!periodStart.value) return ''
-  if (account.value?.isCreditAccount) {
-    return `${periodStart.value.replace(/-/g, '/')} - ${periodEnd.value.replace(/-/g, '/')}`
-  } else {
-    const d = new Date(periodStart.value)
-    return `${d.getFullYear()}年${String(d.getMonth() + 1).padStart(2, '0')}月`
-  }
+  return `${periodStart.value.replace(/-/g, '/')} - ${periodEnd.value.replace(/-/g, '/')}`
 })
 
 // Stats
