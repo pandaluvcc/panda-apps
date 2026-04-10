@@ -16,6 +16,8 @@ import org.springframework.data.domain.Sort;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -159,13 +161,13 @@ public class AccountService {
         List<Record> nonTransfers = recordRepository.findNonTransfersByAccountAndDateBetween(
                 account.getName(), startDate, endDate);
 
-        List<Record> all = new java.util.ArrayList<>();
+        List<Record> all = new ArrayList<>();
         all.addAll(transfers);
         all.addAll(nonTransfers);
-        all.sort(java.util.Comparator
+        all.sort(Comparator
                 .comparing(Record::getDate).reversed()
-                .thenComparing(java.util.Comparator.comparing(
-                        Record::getTime, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder()))));
+                .thenComparing(Comparator.comparing(
+                        Record::getTime, Comparator.nullsLast(Comparator.reverseOrder()))));
 
         return all.stream().map(TransactionDTO::fromEntity).collect(Collectors.toList());
     }
@@ -182,7 +184,10 @@ public class AccountService {
 
         // 非转账记录（排除 POSTPONED）
         List<Record> nonTransfers = recordRepository.findByAccountAndDateBetweenAndReconciliationStatusNot(
-                account.getName(), startDate, endDate, Record.RECONCILIATION_POSTPONED);
+                account.getName(), startDate, endDate, Record.RECONCILIATION_POSTPONED)
+                .stream()
+                .filter(r -> !"转账".equals(r.getRecordType()))
+                .collect(Collectors.toList());
 
         BigDecimal income = BigDecimal.ZERO;
         BigDecimal expense = BigDecimal.ZERO;
@@ -209,6 +214,12 @@ public class AccountService {
         BigDecimal paidAmount = incomingTransfers.stream()
                 .map(r -> r.getAmount().abs())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        for (Record r : incomingTransfers) {
+            if (Record.RECONCILIATION_CONFIRMED.equals(r.getReconciliationStatus())) {
+                confirmedCount++;
+            }
+        }
 
         // remainingDebt = max(0, newExpense - paidAmount)（不含上期欠款，上期欠款由前端额外请求）
         BigDecimal remainingDebt = expense.subtract(paidAmount).max(BigDecimal.ZERO);
