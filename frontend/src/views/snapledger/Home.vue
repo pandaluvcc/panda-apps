@@ -74,6 +74,8 @@
                 v-for="acc in group.accounts"
                 :key="acc.id"
                 class="account-row"
+                style="cursor: pointer"
+                @click="$router.push('/snap/account/' + acc.id)"
               >
                 <span class="account-name">{{ acc.name }}</span>
                 <span :class="['account-balance', (acc.balance || 0) >= 0 ? 'amount-positive' : 'amount-negative']">

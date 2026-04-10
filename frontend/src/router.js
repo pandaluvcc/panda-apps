@@ -91,6 +91,12 @@ const routes = [
     meta: { module: 'snapledger', transition: 'page-slide' }
   },
   {
+    path: '/snap/account/:id',
+    name: 'SnapAccountDetail',
+    component: () => import('@/views/snapledger/AccountDetail.vue'),
+    meta: { module: 'snapledger', transition: 'page-slide' }
+  },
+  {
     path: '/snap/edit/:id',
     name: 'SnapEditRecord',
     component: SnapAddRecord,
