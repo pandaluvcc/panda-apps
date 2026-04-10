@@ -25,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -191,12 +192,18 @@ public class MozeCsvImporter {
                 .collect(Collectors.toList());
     }
 
-    /** 生成记录指纹：date|time|account|amount|recordType */
+    /**
+     * 生成记录指纹：date|time|account|amount|recordType
+     * amount 统一规范化为 2 位小数，避免 "-50" 与 DB 读回的 "-50.00" 不匹配
+     */
     private String fingerprint(Record r) {
+        String amount = r.getAmount() != null
+                ? r.getAmount().setScale(2, RoundingMode.HALF_UP).toPlainString()
+                : "";
         return r.getDate() + "|"
-                + (r.getTime() != null ? r.getTime() : "")  + "|"
+                + (r.getTime() != null ? r.getTime() : "") + "|"
                 + (r.getAccount() != null ? r.getAccount() : "") + "|"
-                + (r.getAmount() != null ? r.getAmount().toPlainString() : "") + "|"
+                + amount + "|"
                 + (r.getRecordType() != null ? r.getRecordType() : "");
     }
 
