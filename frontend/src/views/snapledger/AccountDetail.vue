@@ -331,6 +331,8 @@ const remainingDebt = computed(() => {
 
 async function loadStats() {
   if (!account.value || !periodStart.value) return
+  summary.value = null
+  prevSummary.value = null
   statsLoading.value = true
   try {
     const id = route.params.id
