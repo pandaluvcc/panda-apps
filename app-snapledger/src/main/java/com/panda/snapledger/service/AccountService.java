@@ -19,6 +19,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -106,6 +107,14 @@ public class AccountService {
         account.setForeignTransactionFee(dto.getForeignTransactionFee());
         account.setIncludeInTotal(dto.getIncludeInTotal());
         account.setShowOnWidget(dto.getShowOnWidget());
+        account.setCreditDueDate(dto.getCreditDueDate());
+        account.setCreditLimit(dto.getCreditLimit());
+        account.setCreditLimitSharing(dto.getCreditLimitSharing());
+        account.setMasterAccountName(dto.getMasterAccountName());
+        account.setAutoDebitAccount(dto.getAutoDebitAccount());
+        account.setBillDiscount(dto.getBillDiscount() != null && dto.getBillDiscount());
+        account.setInterestFreeRecommend(dto.getInterestFreeRecommend() != null && dto.getInterestFreeRecommend());
+        account.setCashbackInfo(dto.getCashbackInfo());
         account.setRemark(dto.getRemark());
 
         Account saved = accountRepository.save(account);
@@ -149,14 +158,26 @@ public class AccountService {
 
     /**
      * 获取账户交易明细（按周期过滤）
-     * 转账记录双向展示；非转账记录只查本账户
+     * 一般记录：按账单周期 [startDate, endDate]
+     * 还款记录：信用卡使用还款窗口期 [cycleEnd+1, dueDate]，非信用卡沿用账单周期
      */
     public List<TransactionDTO> getTransactions(Long accountId, LocalDate startDate, LocalDate endDate) {
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new RuntimeException("账户不存在：" + accountId));
 
+        // 信用卡还款窗口期：还款日期在 [cycleEnd+1, dueDate]，归属本期
+        LocalDate transferStart = startDate;
+        LocalDate transferEnd = endDate;
+        if (Boolean.TRUE.equals(account.getIsCreditAccount()) && account.getCreditDueDate() != null) {
+            int dueDay = account.getCreditDueDate().getDayOfMonth();
+            LocalDate nextCycleStart = endDate.plusDays(1);
+            transferStart = nextCycleStart;
+            transferEnd = nextCycleStart.withDayOfMonth(
+                    Math.min(dueDay, nextCycleStart.lengthOfMonth()));
+        }
+
         List<Record> transfers = recordRepository.findTransfersByAccountOrTargetAndDateBetween(
-                account.getName(), startDate, endDate);
+                account.getName(), transferStart, transferEnd);
 
         List<Record> nonTransfers = recordRepository.findNonTransfersByAccountAndDateBetween(
                 account.getName(), startDate, endDate);
@@ -182,11 +203,13 @@ public class AccountService {
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new RuntimeException("账户不存在：" + accountId));
 
-        // 非转账记录（排除 POSTPONED）
+        // 非转账/还款记录（排除 POSTPONED）
+        // 排除所有转账类 recordType：手动录入的 '转账'/'还款' + Moze 导入的 '转出'/'转入'
+        Set<String> transferTypes = Set.of("转账", "还款", "转出", "转入");
         List<Record> nonTransfers = recordRepository.findByAccountAndDateBetweenAndReconciliationStatusNot(
                 account.getName(), startDate, endDate, Record.RECONCILIATION_POSTPONED)
                 .stream()
-                .filter(r -> !"转账".equals(r.getRecordType()))
+                .filter(r -> !transferTypes.contains(r.getRecordType()))
                 .collect(Collectors.toList());
 
         BigDecimal income = BigDecimal.ZERO;
@@ -209,8 +232,18 @@ public class AccountService {
         }
 
         // 收到的转账（转入本账户），用于已还金额
+        // 信用卡：使用还款窗口期 [cycleEnd+1, dueDate]
+        LocalDate paidStart = startDate;
+        LocalDate paidEnd = endDate;
+        if (Boolean.TRUE.equals(account.getIsCreditAccount()) && account.getCreditDueDate() != null) {
+            int dueDay = account.getCreditDueDate().getDayOfMonth();
+            LocalDate nextCycleStart = endDate.plusDays(1);
+            paidStart = nextCycleStart;
+            paidEnd = nextCycleStart.withDayOfMonth(
+                    Math.min(dueDay, nextCycleStart.lengthOfMonth()));
+        }
         List<Record> incomingTransfers = recordRepository.findIncomingTransfersByTargetAndDateBetweenAndStatusNot(
-                account.getName(), startDate, endDate, Record.RECONCILIATION_POSTPONED);
+                account.getName(), paidStart, paidEnd, Record.RECONCILIATION_POSTPONED);
         BigDecimal paidAmount = incomingTransfers.stream()
                 .map(r -> r.getAmount().abs())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);

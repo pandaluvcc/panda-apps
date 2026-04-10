@@ -103,6 +103,7 @@
                 <div class="record-sub">{{ tx.account }} → {{ tx.target }}</div>
               </div>
               <div class="record-right">
+                <div class="record-date">{{ fmtDate(tx.date, tx.time) }}</div>
                 <div class="record-amount">￥{{ fmt(tx.amount) }}</div>
                 <span class="tag tag-transfer">{{ tx.target === account?.name ? '还款' : '转出' }}</span>
               </div>
@@ -142,6 +143,7 @@
                 </div>
               </div>
               <div class="record-right">
+                <div class="record-date">{{ fmtDate(tx.date, tx.time) }}</div>
                 <div class="record-amount" :class="tx.recordType === '收入' ? 'amount-income' : ''">
                   {{ tx.recordType === '收入' ? '+' : '' }}￥{{ fmt(tx.amount) }}
                 </div>
@@ -154,22 +156,26 @@
       <!-- 账户信息 tab -->
       <template v-else-if="activeTab === '账户信息'">
         <div class="info-form">
+          <!-- 基本信息 -->
           <div class="form-section">
             <div class="form-item">
-              <span class="form-label">账户名称</span>
-              <input v-model="infoForm.name" class="form-input" placeholder="请输入账户名称" />
+              <span class="form-label">名称</span>
+              <input v-model="infoForm.name" class="form-input" placeholder="请输入账户名称" @blur="autoSave" />
             </div>
             <div class="form-item">
               <span class="form-label">主币种</span>
               <span class="form-value">{{ infoForm.mainCurrency }}</span>
             </div>
-            <div class="form-item">
+            <div class="form-item form-item--picker" @click="showGroupPicker = true">
               <span class="form-label">账户分组</span>
-              <span class="form-value">{{ infoForm.accountGroup }}</span>
+              <div class="form-picker-value">
+                <span>{{ infoForm.accountGroup || '未分组' }}</span>
+                <span class="picker-arrow">›</span>
+              </div>
             </div>
             <div class="form-item">
               <span class="form-label">初始余额</span>
-              <input v-model.number="infoForm.initialBalance" class="form-input" type="number" placeholder="0" />
+              <input v-model.number="infoForm.initialBalance" class="form-input" type="number" placeholder="0" @blur="autoSave" />
             </div>
             <div class="form-item form-item--picker" @click="openBillCyclePicker">
               <span class="form-label">账单周期</span>
@@ -180,40 +186,76 @@
             </div>
           </div>
 
+          <!-- 信用账户及子字段 -->
           <div class="form-section">
             <div class="form-item form-item--switch">
               <span class="form-label">信用账户</span>
-              <van-switch v-model="infoForm.isCreditAccount" size="22" />
+              <van-switch v-model="infoForm.isCreditAccount" size="22" @update:modelValue="autoSave" />
+            </div>
+            <template v-if="infoForm.isCreditAccount">
+              <div class="form-item form-item--sub form-item--picker" @click="openCreditDueDatePicker">
+                <span class="form-label">到期还款日</span>
+                <div class="form-picker-value">
+                  <span>{{ infoForm.creditDueDate ? `每月第${parseInt(infoForm.creditDueDate.split('-')[2], 10)}日` : '未设置' }}</span>
+                  <span class="picker-arrow">›</span>
+                </div>
+              </div>
+              <div class="form-item form-item--sub">
+                <span class="form-label">信用额度</span>
+                <input v-model.number="infoForm.creditLimit" class="form-input" type="number" placeholder="未设置" @blur="autoSave" />
+              </div>
+              <div class="form-item form-item--sub">
+                <span class="form-label">额度共享</span>
+                <input v-model="infoForm.creditLimitSharing" class="form-input" placeholder="无" @blur="autoSave" />
+              </div>
+              <div class="form-item form-item--sub">
+                <span class="form-label">主账户</span>
+                <input v-model="infoForm.masterAccountName" class="form-input" placeholder="无" @blur="autoSave" />
+              </div>
+              <div class="form-item form-item--sub">
+                <span class="form-label">自动扣缴</span>
+                <input v-model="infoForm.autoDebitAccount" class="form-input" placeholder="无" @blur="autoSave" />
+              </div>
+              <div class="form-item form-item--sub form-item--switch">
+                <span class="form-label">账单折抵</span>
+                <van-switch v-model="infoForm.billDiscount" size="22" @update:modelValue="autoSave" />
+              </div>
+              <div class="form-item form-item--sub form-item--switch">
+                <span class="form-label">免息期推荐</span>
+                <van-switch v-model="infoForm.interestFreeRecommend" size="22" @update:modelValue="autoSave" />
+              </div>
+              <div v-if="interestFreeDays !== null" class="form-item form-item--sub">
+                <span class="form-label">目前免息天数</span>
+                <span class="form-value">{{ interestFreeDays }}天</span>
+              </div>
+            </template>
+          </div>
+
+          <!-- 其他设置 -->
+          <div class="form-section">
+            <div class="form-item">
+              <span class="form-label">返利回馈</span>
+              <input v-model="infoForm.cashbackInfo" class="form-input" placeholder="无" @blur="autoSave" />
             </div>
             <div class="form-item form-item--switch">
               <span class="form-label">自动转存</span>
-              <van-switch v-model="infoForm.autoRollover" size="22" />
-            </div>
-            <div class="form-item form-item--switch">
-              <span class="form-label">国外手续费</span>
-              <van-switch v-model="infoForm.foreignTransactionFee" size="22" />
+              <van-switch v-model="infoForm.autoRollover" size="22" @update:modelValue="autoSave" />
             </div>
             <div class="form-item form-item--switch">
               <span class="form-label">纳入总余额</span>
-              <van-switch v-model="infoForm.includeInTotal" size="22" />
+              <van-switch v-model="infoForm.includeInTotal" size="22" @update:modelValue="autoSave" />
             </div>
           </div>
 
+          <!-- 备注 -->
           <div class="form-section">
             <div class="form-item">
               <span class="form-label">备注</span>
-              <input v-model="infoForm.remark" class="form-input" placeholder="可选" />
+              <input v-model="infoForm.remark" class="form-input" placeholder="可选" @blur="autoSave" />
             </div>
           </div>
 
-          <div class="save-area">
-            <van-button
-              type="primary" block round
-              :loading="saving"
-              :disabled="!isDirty"
-              @click="saveAccountInfo"
-            >保存</van-button>
-          </div>
+          <div v-if="autoSaving" class="autosave-tip">保存中...</div>
         </div>
       </template>
     </div>
@@ -230,24 +272,53 @@
     />
   </van-popup>
 
-  <!-- 账单周期起始日选择器 -->
-  <van-popup v-model:show="showBillCyclePicker" position="bottom" round>
+  <!-- 账单周期选择器（居中滑块） -->
+  <van-popup v-model:show="showBillCyclePicker" position="center" :style="{ width: '85%', borderRadius: '16px' }">
+    <div class="slide-picker">
+      <div class="slide-picker-title">账单周期</div>
+      <div class="slide-picker-preview">{{ previewBillCycleRange }}</div>
+      <div class="slide-picker-track">
+        <input
+          type="range" min="1" max="28"
+          v-model.number="tempBillCycleDay"
+          class="cycle-slider"
+          :style="sliderFillStyle"
+        />
+      </div>
+      <div class="slide-picker-label">账单日：每月第 {{ tempBillCycleDay }} 日</div>
+      <div class="slide-picker-footer">
+        <button class="slide-btn" @click="showBillCyclePicker = false">取消</button>
+        <button class="slide-btn" @click="confirmBillCycleDay">确定</button>
+      </div>
+    </div>
+  </van-popup>
+
+  <!-- 到期还款日选择器（每月第几日） -->
+  <van-popup v-model:show="showCreditDueDatePicker" position="bottom" round>
     <van-picker
-      v-model="billCyclePickerDay"
-      :columns="billCycleDayColumns"
-      title="账单起始日"
-      @confirm="onBillCycleDayConfirm"
-      @cancel="showBillCyclePicker = false"
+      v-model="creditDueDatePickerVal"
+      :columns="creditDueDayColumns"
+      title="到期还款日"
+      @confirm="onCreditDueDateConfirm"
+      @cancel="showCreditDueDatePicker = false"
     />
   </van-popup>
+
+  <!-- 账户分组选择器 -->
+  <AccountGroupPicker
+    v-model:show="showGroupPicker"
+    :modelValue="infoForm.accountGroup"
+    @update:modelValue="val => { infoForm.accountGroup = val; autoSave() }"
+  />
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showConfirmDialog, showToast } from 'vant'
+import { showToast } from 'vant'
 import { useAccountForm } from '@/composables/useAccountForm'
 import { getAccount, updateAccount, getAccountSummary, getAccountTransactions } from '@/api'
+import AccountGroupPicker from '@/components/snapledger/AccountGroupPicker.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -338,6 +409,18 @@ function fmt(val) {
   return Number(val).toFixed(2)
 }
 
+const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+function fmtDate(dateStr, timeStr) {
+  if (!dateStr) return ''
+  const parts = String(dateStr).split('-')
+  if (parts.length < 3) return dateStr
+  const [y, m, d] = parts.map(Number)
+  const week = WEEKDAYS[new Date(y, m - 1, d).getDay()]
+  const ds = `${y}/${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')}`
+  const ts = timeStr ? ' ' + String(timeStr).slice(0, 5) : ''
+  return `${ds} ${week}${ts}`
+}
+
 function getPrevPeriodDates() {
   if (account.value?.isCreditAccount && account.value?.billCycleStart) {
     const cycleDay = parseCycleDay(account.value.billCycleStart)
@@ -394,15 +477,15 @@ const sortedNonTransfers = computed(() => {
   return list
 })
 
-// 还款记录：包含"转账"和 Moze 导出的"还款"类型
-const REPAYMENT_TYPES = new Set(['转账', '还款'])
+// 转账/还款类型：手动录入的 '转账'/'还款' + Moze 导入的 '转出'/'转入'
+const TRANSFER_TYPES = new Set(['转账', '还款', '转出', '转入'])
 
 async function loadTransactions() {
   if (!account.value || !periodStart.value) return
   try {
     const all = await getAccountTransactions(route.params.id, periodStart.value, periodEnd.value)
-    transfers.value = all.filter(r => REPAYMENT_TYPES.has(r.recordType))
-    nonTransfers.value = all.filter(r => !REPAYMENT_TYPES.has(r.recordType))
+    transfers.value = all.filter(r => TRANSFER_TYPES.has(r.recordType))
+    nonTransfers.value = all.filter(r => !TRANSFER_TYPES.has(r.recordType))
   } catch {
     showToast('记录加载失败')
   }
@@ -467,12 +550,57 @@ function onPeriodPickerConfirm({ selectedValues }) {
 }
 
 // Account info form
-const { form: infoForm, isDirty, loadFromAccount, toPayload, validate } = useAccountForm()
-const saving = ref(false)
+const { form: infoForm, loadFromAccount, toPayload, validate } = useAccountForm()
+const autoSaving = ref(false)
 
-// 账单周期选择器
+// 账户分组选择器
+const showGroupPicker = ref(false)
+
+// 账单周期选择器（滑块）
 const showBillCyclePicker = ref(false)
-const billCyclePickerDay = ref(['01'])
+const tempBillCycleDay = ref(1)
+
+// 到期还款日选择器（每月第几日）
+const showCreditDueDatePicker = ref(false)
+const creditDueDatePickerVal = ref(['20'])
+
+const creditDueDayColumns = Array.from({ length: 28 }, (_, i) => ({
+  text: `每月第${i + 1}日`,
+  value: String(i + 1).padStart(2, '0')
+}))
+
+function openCreditDueDatePicker() {
+  if (infoForm.creditDueDate) {
+    creditDueDatePickerVal.value = [infoForm.creditDueDate.split('-')[2]]
+  } else {
+    creditDueDatePickerVal.value = ['20']
+  }
+  showCreditDueDatePicker.value = true
+}
+
+function onCreditDueDateConfirm({ selectedValues }) {
+  const day = parseInt(selectedValues[0], 10)
+  const now = new Date()
+  const pad = d => String(d).padStart(2, '0')
+  infoForm.creditDueDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(day)}`
+  showCreditDueDatePicker.value = false
+  autoSave()
+}
+
+// 目前免息天数：今天到本月（或下月）到期还款日的剩余天数
+const interestFreeDays = computed(() => {
+  if (!infoForm.creditDueDate) return null
+  const dueDay = parseInt(infoForm.creditDueDate.split('-')[2], 10)
+  const today = new Date()
+  const todayDay = today.getDate()
+  const y = today.getFullYear()
+  const m = today.getMonth()
+  const dueDate = todayDay <= dueDay
+    ? new Date(y, m, dueDay)
+    : new Date(y, m + 1, dueDay)
+  const todayMidnight = new Date(y, m, todayDay)
+  return Math.max(0, Math.round((dueDate - todayMidnight) / 86400000))
+})
 
 // 从 billCycleStart 字符串或 Date 中提取日（天）
 function getCycleDayFromForm() {
@@ -489,19 +617,32 @@ const billCycleInfoDisplay = computed(() => {
   return `每月${day}日 — 次月${endDay}日`
 })
 
-const billCycleDayColumns = Array.from({ length: 28 }, (_, i) => ({
-  text: `${i + 1}日`,
-  value: String(i + 1).padStart(2, '0')
-}))
+// 账单周期预览（随滑块实时更新）
+const previewBillCycleRange = computed(() => {
+  const day = tempBillCycleDay.value
+  const today = new Date()
+  let y = today.getFullYear()
+  let m = today.getMonth()
+  if (today.getDate() < day) {
+    m -= 1
+    if (m < 0) { m = 11; y -= 1 }
+  }
+  const { start, end } = cyclePeriodDates(y, m, day)
+  return `${start.replace(/-/g, '/')} — ${end.replace(/-/g, '/')}`
+})
+
+const sliderFillStyle = computed(() => {
+  const pct = ((tempBillCycleDay.value - 1) / 27 * 100).toFixed(1)
+  return { background: `linear-gradient(to right, #1989fa ${pct}%, #e5e5e5 ${pct}%)` }
+})
 
 function openBillCyclePicker() {
-  const day = getCycleDayFromForm()
-  billCyclePickerDay.value = [String(Math.min(day || 1, 28)).padStart(2, '0')]
+  tempBillCycleDay.value = getCycleDayFromForm() || 1
   showBillCyclePicker.value = true
 }
 
-function onBillCycleDayConfirm({ selectedValues }) {
-  const day = parseInt(selectedValues[0], 10)
+function confirmBillCycleDay() {
+  const day = tempBillCycleDay.value
   const now = new Date()
   const pad = d => String(d).padStart(2, '0')
   infoForm.billCycleStart = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(day)}`
@@ -511,44 +652,33 @@ function onBillCycleDayConfirm({ selectedValues }) {
   if (endMonth > 12) { endMonth = 1; endYear += 1 }
   infoForm.billCycleEnd = `${endYear}-${pad(endMonth)}-${pad(endDay)}`
   showBillCyclePicker.value = false
+  autoSave()
 }
 
 watch(account, (acc) => {
   if (acc) loadFromAccount(acc)
 }, { immediate: true })
 
-async function saveAccountInfo() {
+async function autoSave() {
   const err = validate()
   if (err) { showToast(err); return }
-  saving.value = true
+  autoSaving.value = true
   try {
-    await updateAccount(route.params.id, toPayload())
-    showToast('保存成功')
-    account.value = await getAccount(route.params.id)
-    loadFromAccount(account.value)
+    const updated = await updateAccount(route.params.id, toPayload())
+    account.value = updated
+    loadFromAccount(updated)
     // Re-compute period in case isCreditAccount or billCycleStart changed
-    const { start, end } = computeDefaultPeriod(account.value)
+    const { start, end } = computeDefaultPeriod(updated)
     periodStart.value = start
     periodEnd.value = end
   } catch (e) {
-    showToast('保存失败: ' + (e.message || e))
+    showToast('保存失败')
   } finally {
-    saving.value = false
+    autoSaving.value = false
   }
 }
 
-async function handleBack() {
-  if (activeTab.value === '账户信息' && isDirty.value) {
-    try {
-      await showConfirmDialog({
-        title: '有未保存的更改',
-        message: '确定放弃更改并返回？',
-        confirmButtonText: '放弃'
-      })
-    } catch {
-      return
-    }
-  }
+function handleBack() {
   router.back()
 }
 
@@ -660,7 +790,8 @@ onMounted(async () => {
 .record-mid { flex: 1; min-width: 0; }
 .record-name { font-size: 14px; color: #333; font-weight: 500; }
 .record-sub { font-size: 12px; color: #999; margin-top: 2px; display: flex; gap: 4px; flex-wrap: wrap; }
-.record-right { text-align: right; flex-shrink: 0; }
+.record-right { text-align: right; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.record-date { font-size: 11px; color: #bbb; }
 .record-amount { font-size: 15px; font-weight: 500; color: #333; }
 .amount-income { color: #67c23a; }
 .tag {
@@ -688,11 +819,38 @@ onMounted(async () => {
   flex: 1; text-align: right; border: none; outline: none;
   font-size: 14px; color: #333; background: transparent;
 }
-.save-area { padding: 8px 0 24px; }
 .form-item--picker { cursor: pointer; }
 .form-picker-value {
   display: flex; align-items: center; gap: 4px;
   font-size: 14px; color: #666;
 }
 .picker-arrow { color: #bbb; font-size: 16px; }
+.form-item--sub { padding-left: 32px; background: #fafafa; }
+.autosave-tip {
+  text-align: center; font-size: 12px; color: #999; padding: 8px 0 16px;
+}
+/* 账单周期滑块选择器 */
+.slide-picker { padding: 24px 24px 20px; }
+.slide-picker-title { text-align: center; font-size: 17px; font-weight: 600; color: #1a1a1a; margin-bottom: 20px; }
+.slide-picker-preview { text-align: center; font-size: 16px; font-weight: 500; color: #1a1a1a; margin-bottom: 14px; }
+.slide-picker-track { padding: 0 4px; margin-bottom: 10px; }
+.cycle-slider {
+  width: 100%; height: 4px; -webkit-appearance: none; appearance: none;
+  border-radius: 2px; outline: none; cursor: pointer;
+}
+.cycle-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 26px; height: 26px;
+  border-radius: 50%; background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25); cursor: pointer;
+}
+.cycle-slider::-moz-range-thumb {
+  width: 26px; height: 26px; border-radius: 50%; background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25); border: none; cursor: pointer;
+}
+.slide-picker-label { text-align: center; font-size: 14px; color: #888; margin-bottom: 24px; }
+.slide-picker-footer { display: flex; gap: 12px; }
+.slide-btn {
+  flex: 1; height: 48px; border-radius: 10px; font-size: 16px;
+  border: none; cursor: pointer; background: #f2f2f2; color: #333;
+}
 </style>

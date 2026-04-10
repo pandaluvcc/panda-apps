@@ -67,6 +67,30 @@ public class Account {
     @Column(name = "show_on_widget")
     private Boolean showOnWidget = true;
 
+    @Column(name = "credit_due_date")
+    private LocalDate creditDueDate;
+
+    @Column(name = "credit_limit", precision = 12, scale = 2)
+    private BigDecimal creditLimit;
+
+    @Column(name = "credit_limit_sharing", length = 100)
+    private String creditLimitSharing;
+
+    @Column(name = "master_account_name", length = 100)
+    private String masterAccountName;
+
+    @Column(name = "auto_debit_account", length = 100)
+    private String autoDebitAccount;
+
+    @Column(name = "bill_discount")
+    private Boolean billDiscount = false;
+
+    @Column(name = "interest_free_recommend")
+    private Boolean interestFreeRecommend = false;
+
+    @Column(name = "cashback_info", length = 200)
+    private String cashbackInfo;
+
     @Column(name = "remark", length = 500)
     private String remark;
 

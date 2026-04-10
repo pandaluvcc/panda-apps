@@ -10,6 +10,14 @@ export function useAccountForm() {
     billCycleStart: null,
     billCycleEnd: null,
     isCreditAccount: false,
+    creditDueDate: null,
+    creditLimit: null,
+    creditLimitSharing: '',
+    masterAccountName: '',
+    autoDebitAccount: '',
+    billDiscount: false,
+    interestFreeRecommend: false,
+    cashbackInfo: '',
     autoRollover: false,
     foreignTransactionFee: false,
     includeInTotal: true,
@@ -32,6 +40,14 @@ export function useAccountForm() {
     form.billCycleStart = account.billCycleStart || null
     form.billCycleEnd = account.billCycleEnd || null
     form.isCreditAccount = account.isCreditAccount || false
+    form.creditDueDate = account.creditDueDate || null
+    form.creditLimit = account.creditLimit ?? null
+    form.creditLimitSharing = account.creditLimitSharing || ''
+    form.masterAccountName = account.masterAccountName || ''
+    form.autoDebitAccount = account.autoDebitAccount || ''
+    form.billDiscount = account.billDiscount || false
+    form.interestFreeRecommend = account.interestFreeRecommend || false
+    form.cashbackInfo = account.cashbackInfo || ''
     form.autoRollover = account.autoRollover || false
     form.foreignTransactionFee = account.foreignTransactionFee || false
     form.includeInTotal = account.includeInTotal !== false
@@ -52,6 +68,14 @@ export function useAccountForm() {
         ? form.billCycleEnd.toISOString().slice(0, 10)
         : form.billCycleEnd || null,
       isCreditAccount: form.isCreditAccount,
+      creditDueDate: form.creditDueDate || null,
+      creditLimit: form.creditLimit != null ? Number(form.creditLimit) : null,
+      creditLimitSharing: form.creditLimitSharing,
+      masterAccountName: form.masterAccountName,
+      autoDebitAccount: form.autoDebitAccount,
+      billDiscount: form.billDiscount,
+      interestFreeRecommend: form.interestFreeRecommend,
+      cashbackInfo: form.cashbackInfo,
       autoRollover: form.autoRollover,
       foreignTransactionFee: form.foreignTransactionFee,
       includeInTotal: form.includeInTotal,
