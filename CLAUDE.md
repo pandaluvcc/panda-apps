@@ -213,6 +213,8 @@ SNAPLEDGER_DB_PASSWORD=your_password
 ### Snap Ledger
 - `GET/POST /api/snapledger/record` - Transaction records
 - `GET/POST /api/snapledger/account` - Account management
+- `GET /api/snapledger/accounts/:id/transactions` - Account transaction list (by period)
+- `GET /api/snapledger/accounts/:id/summary` - Period summary statistics
 - `GET /api/snapledger/calendar` - Monthly calendar data
 - `GET/POST /api/snapledger/stats` - Statistics
 - `GET/POST /api/snapledger/budget` - Budget management
@@ -258,6 +260,22 @@ Add SQL files to `app-*/src/main/resources/db/migration/` with version prefix (e
 
 ### Adding frontend routes
 Edit `frontend/src/router.js` - routes use module metadata for transition handling.
+
+## Snap Ledger Record Type Classification
+
+Moze CSV 导入的记录包含 13 种 `recordType`，系统按以下矩阵分类处理：
+
+| 类别 | recordType 值 | 统计处理 |
+|------|-------------|---------|
+| 支出类 | `支出`, `手续费`, `利息` | 计入支出 |
+| 收入类 | `收入` | 计入收入 |
+| 抵扣类 | `退款`, `折扣` | 冲减支出，不计收入 |
+| 转账类 | `转出`, `转入`, `转账`, `还款`, `应付款项`, `应收款项`, `分期还款` | 排除出收支统计，显示在还款/转账记录列表 |
+| 特殊类 | `余额调整`, `账单分期` | 排除出收支统计 |
+
+**信用卡还款窗口期**：信用卡账户的还款记录不按账单周期 `[startDate, endDate]` 查询，而是按还款窗口期 `[cycleEnd+1, dueDate]` 查询。例如账单周期 12/03-01/02、到期还款日 20 号 → 还款窗口 01/03-01/20。
+
+**Moze CSV 转账格式**：Moze 导出的转账/还款记录使用 `转出`/`转入` 成对记录（各一侧），`对象` 字段为空。手动录入的转账使用 `转账`/`还款` 类型，有 `target` 字段。
 
 ## Code Style Guidelines
 

@@ -195,17 +195,25 @@ public class AccountService {
 
     /**
      * 获取周期统计
-     * - 普通账户：本期收入、本期支出、对账笔数
-     * - 信用卡：新增支出、已还金额、对账笔数、remainingDebt（仍需还款，不含上期欠款）
-     * 全部排除 POSTPONED 记录
+     * 基于记录类型分类矩阵：
+     *   支出类: 支出/手续费/利息 → 计入支出
+     *   收入类: 收入 → 计入收入
+     *   抵扣类: 退款/折扣 → 冲减支出，不计收入
+     *   转账类: 转账/还款/转出/转入/应付款项/应收款项/分期还款 → 排除
+     *   特殊类: 余额调整/账单分期 → 排除
      */
     public TransactionSummaryDTO getPeriodSummary(Long accountId, LocalDate startDate, LocalDate endDate) {
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new RuntimeException("账户不存在：" + accountId));
 
-        // 非转账/还款记录（排除 POSTPONED）
-        // 排除所有转账类 recordType：手动录入的 '转账'/'还款' + Moze 导入的 '转出'/'转入'
-        Set<String> transferTypes = Set.of("转账", "还款", "转出", "转入");
+        // 分类常量
+        Set<String> expenseTypes = Set.of("支出", "手续费", "利息");
+        Set<String> incomeTypes  = Set.of("收入");
+        Set<String> offsetTypes  = Set.of("退款", "折扣");
+        Set<String> transferTypes = Set.of("转账", "还款", "转出", "转入",
+                "应付款项", "应收款项", "分期还款");
+
+        // 查询本账户在周期内的非 POSTPONED 记录，排除转账类
         List<Record> nonTransfers = recordRepository.findByAccountAndDateBetweenAndReconciliationStatusNot(
                 account.getName(), startDate, endDate, Record.RECONCILIATION_POSTPONED)
                 .stream()
@@ -214,15 +222,20 @@ public class AccountService {
 
         BigDecimal income = BigDecimal.ZERO;
         BigDecimal expense = BigDecimal.ZERO;
+        BigDecimal refund = BigDecimal.ZERO;
         BigDecimal fee = BigDecimal.ZERO;
         long confirmedCount = 0;
 
         for (Record record : nonTransfers) {
-            if ("收入".equals(record.getRecordType())) {
-                income = income.add(record.getAmount().abs());
-            } else if ("支出".equals(record.getRecordType())) {
+            String type = record.getRecordType();
+            if (expenseTypes.contains(type)) {
                 expense = expense.add(record.getAmount().abs());
+            } else if (incomeTypes.contains(type)) {
+                income = income.add(record.getAmount().abs());
+            } else if (offsetTypes.contains(type)) {
+                refund = refund.add(record.getAmount().abs());
             }
+            // 余额调整、账单分期不计入任何统计
             if (record.getFee() != null) {
                 fee = fee.add(record.getFee());
             }
@@ -231,8 +244,7 @@ public class AccountService {
             }
         }
 
-        // 收到的转账（转入本账户），用于已还金额
-        // 信用卡：使用还款窗口期 [cycleEnd+1, dueDate]
+        // 已还金额：信用卡使用还款窗口期 [cycleEnd+1, dueDate]
         LocalDate paidStart = startDate;
         LocalDate paidEnd = endDate;
         if (Boolean.TRUE.equals(account.getIsCreditAccount()) && account.getCreditDueDate() != null) {
@@ -254,18 +266,19 @@ public class AccountService {
             }
         }
 
-        // remainingDebt = max(0, newExpense - paidAmount)（不含上期欠款，上期欠款由前端额外请求）
-        BigDecimal remainingDebt = expense.subtract(paidAmount).max(BigDecimal.ZERO);
+        // remainingDebt = max(0, newExpense - refund - paidAmount)
+        BigDecimal remainingDebt = expense.subtract(refund).subtract(paidAmount).max(BigDecimal.ZERO);
 
         TransactionSummaryDTO summary = new TransactionSummaryDTO();
         summary.setTotalIncome(income);
         summary.setTotalExpense(expense);
         summary.setTotalFee(fee);
-        summary.setNetAmount(income.subtract(expense));
+        summary.setNetAmount(income.subtract(expense).add(refund));
         summary.setRecordCount((long) nonTransfers.size());
         summary.setPeriodStart(startDate);
         summary.setPeriodEnd(endDate);
         summary.setNewExpense(expense);
+        summary.setRefundAmount(refund);
         summary.setPaidAmount(paidAmount);
         summary.setConfirmedCount(confirmedCount);
         summary.setRemainingDebt(remainingDebt);

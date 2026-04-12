@@ -57,21 +57,21 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
     // 按账户查询（按日期时间倒序）
     List<Record> findByAccountOrderByDateDescTimeDesc(String account);
 
-    // 双向查询转账/还款记录，按日期时间倒序
-    // recordType 覆盖：手动录入的 '转账'/'还款' + Moze 导入的 '转出'/'转入'
+    // 双向查询转账类记录，按日期时间倒序
+    // 转账类 recordType：转账/还款/转出/转入/应付款项/应收款项/分期还款
     @Query("SELECT r FROM Record r WHERE (r.account = :account OR r.target = :account) " +
            "AND r.date BETWEEN :start AND :end " +
-           "AND r.recordType IN ('转账', '还款', '转出', '转入') " +
+           "AND r.recordType IN ('转账','还款','转出','转入','应付款项','应收款项','分期还款') " +
            "ORDER BY r.date DESC, r.time DESC")
     List<Record> findTransfersByAccountOrTargetAndDateBetween(
             @Param("account") String account,
             @Param("start") LocalDate start,
             @Param("end") LocalDate end);
 
-    // 查询一般记录（排除所有转账/还款类型）
+    // 查询一般记录（排除所有转账类 recordType）
     @Query("SELECT r FROM Record r WHERE r.account = :account " +
            "AND r.date BETWEEN :start AND :end " +
-           "AND r.recordType NOT IN ('转账', '还款', '转出', '转入') " +
+           "AND r.recordType NOT IN ('转账','还款','转出','转入','应付款项','应收款项','分期还款') " +
            "ORDER BY r.date DESC, r.time DESC")
     List<Record> findNonTransfersByAccountAndDateBetween(
             @Param("account") String account,
@@ -79,10 +79,10 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
             @Param("end") LocalDate end);
 
     // 查询收到的还款/转账，排除 POSTPONED，用于计算已还金额
-    // 两种格式：① target=本账户(手动录入) ② account=本账户 AND recordType='转入'(Moze导入)
+    // ① target=本账户(手动录入) ② account=本账户 AND recordType='转入'(Moze导入)
     @Query("SELECT r FROM Record r WHERE " +
-           "((r.target = :account AND r.recordType IN ('转账', '还款')) " +
-           " OR (r.account = :account AND r.recordType = '转入')) " +
+           "((r.target = :account AND r.recordType IN ('转账','还款','应付款项','应收款项')) " +
+           " OR (r.account = :account AND r.recordType IN ('转入','分期还款'))) " +
            "AND r.date BETWEEN :start AND :end " +
            "AND (r.reconciliationStatus IS NULL OR r.reconciliationStatus != :status) " +
            "ORDER BY r.date DESC, r.time DESC")

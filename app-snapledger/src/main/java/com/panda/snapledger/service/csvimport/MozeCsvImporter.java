@@ -66,7 +66,9 @@ public class MozeCsvImporter {
                 new InputStreamReader(file.getInputStream(), charset));
              CSVParser csvParser = new CSVParser(reader, CSVFormat.DEFAULT
                      .withFirstRecordAsHeader()
-                     .withTrim())) {
+                     .withTrim()
+                     .withQuote('"')
+                     .withIgnoreEmptyLines(true))) {
 
             for (CSVRecord csvRecord : csvParser) {
                 Record record = parseRecord(csvRecord);

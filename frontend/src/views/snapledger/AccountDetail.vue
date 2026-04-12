@@ -39,6 +39,10 @@
               <span class="stat-label">新增支出</span>
               <span class="stat-value">-￥{{ fmt(summary.newExpense) }}</span>
             </div>
+            <div v-if="Number(summary.refundAmount) > 0" class="stat-row">
+              <span class="stat-label">退款/折扣</span>
+              <span class="stat-value" style="color:#67c23a">￥{{ fmt(summary.refundAmount) }}</span>
+            </div>
             <div class="stat-row">
               <span class="stat-label">上期欠款</span>
               <span class="stat-value">-￥{{ fmt(previousDebt) }}</span>
@@ -440,7 +444,7 @@ function getPrevPeriodDates() {
 const previousDebt = computed(() => prevSummary.value?.remainingDebt ?? 0)
 const billAmount = computed(() => {
   if (!summary.value) return 0
-  return Number(previousDebt.value) + Number(summary.value.newExpense ?? 0)
+  return Number(previousDebt.value) + Number(summary.value.newExpense ?? 0) - Number(summary.value.refundAmount ?? 0)
 })
 const remainingDebt = computed(() => {
   const debt = billAmount.value - Number(summary.value?.paidAmount ?? 0)
@@ -477,8 +481,10 @@ const sortedNonTransfers = computed(() => {
   return list
 })
 
-// 转账/还款类型：手动录入的 '转账'/'还款' + Moze 导入的 '转出'/'转入'
-const TRANSFER_TYPES = new Set(['转账', '还款', '转出', '转入'])
+// 转账类 recordType（排除出一般记录列表）
+const TRANSFER_TYPES = new Set([
+  '转账', '还款', '转出', '转入', '应付款项', '应收款项', '分期还款'
+])
 
 async function loadTransactions() {
   if (!account.value || !periodStart.value) return
