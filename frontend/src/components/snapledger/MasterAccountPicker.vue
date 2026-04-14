@@ -1,5 +1,5 @@
 <template>
-  <van-popup v-model:show="show" position="bottom" round :style="{ maxHeight: '70vh' }">
+  <van-popup v-model:show="showPopup" position="bottom" round :style="{ maxHeight: '70vh' }">
     <div class="master-picker">
       <div class="picker-header">
         <span class="picker-title">选择主账户</span>
@@ -63,6 +63,12 @@ const emit = defineEmits(['update:show', 'update:modelValue'])
 
 const router = useRouter()
 const allAccounts = ref([])
+
+// 计算属性双向绑定 show prop
+const showPopup = computed({
+  get: () => props.show,
+  set: (val) => emit('update:show', val)
+})
 
 onMounted(async () => {
   try {
