@@ -115,7 +115,24 @@
         <!-- 信用账户 -->
         <div class="settings-row">
           <span class="row-label">信用账户</span>
-          <van-switch v-model="form.isCreditAccount" size="22px" active-color="#1890FF" />
+          <van-switch v-model="form.isCreditAccount" size="22px" active-color="#1890FF" @update:modelValue="onCreditChange" />
+        </div>
+
+        <!-- 主账户（标记此账户为主账户） -->
+        <div class="settings-row">
+          <span class="row-label">主账户</span>
+          <van-switch v-model="form.isMasterAccount" size="22px" active-color="#1890FF" @update:modelValue="onMasterToggle" />
+        </div>
+
+        <!-- 所属主账户（仅子账户显示） -->
+        <div v-if="!form.isMasterAccount" class="settings-row" @click="showMasterPicker = true">
+          <span class="row-label">所属主账户</span>
+          <div class="row-value row-picker">
+            <span>{{ form.masterAccountName || '无' }}</span>
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </div>
         </div>
 
         <!-- 自动转存 -->
@@ -168,15 +185,24 @@
         @cancel="showBillCyclePicker = false"
       />
     </van-popup>
+
+    <!-- 主账户选择器 -->
+    <MasterAccountPicker
+      v-model:show="showMasterPicker"
+      v-model="form.masterAccountName"
+      :creditGroupOnly="form.accountGroup === '信用卡'"
+      @update:modelValue="onMasterSelected"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
-import { createAccount } from '@/api'
+import { ref, computed, nextTick, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { createAccount, getAccounts } from '@/api'
 import { showToast, showConfirmDialog } from 'vant'
 import AccountGroupPicker from '@/components/snapledger/AccountGroupPicker.vue'
+import MasterAccountPicker from '@/components/snapledger/MasterAccountPicker.vue'
 import { useAccountForm } from '@/composables/useAccountForm'
 
 const router = useRouter()
@@ -186,6 +212,7 @@ const nameInputRef = ref(null)
 const showGroupPicker = ref(false)
 const showCurrencyPicker = ref(false)
 const showBillCyclePicker = ref(false)
+const showMasterPicker = ref(false)
 
 const { form, isDirty, validate, toPayload, snapshot } = useAccountForm()
 
@@ -236,6 +263,67 @@ function onBillCycleConfirm({ selectedValues }) {
   form.billCycleEnd   = new Date(year, month, 0)
   showBillCyclePicker.value = false
 }
+
+// 主账户开关切换
+function onMasterToggle(val) {
+  if (val) {
+    form.masterAccountName = null
+  }
+}
+
+// 从主账户选择器选择后
+function onMasterSelected(name) {
+  form.masterAccountName = name
+  // 子账户分组跟随主账户：需要查询主账户的分组
+  if (name) {
+    const master = allAccounts.value.find(a => a.name === name)
+    if (master) {
+      form.accountGroup = master.accountGroup
+    }
+  }
+}
+
+// 信用账户切换时确保账单周期已设置
+function onCreditChange(val) {
+  if (val && !form.billCycleStart) {
+    const now = new Date()
+    form.billCycleStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    form.billCycleEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  }
+}
+
+// 路由参数自动设置
+const route = useRoute()
+const allAccounts = ref([])
+
+onMounted(async () => {
+  try {
+    allAccounts.value = await getAccounts()
+  } catch {
+    allAccounts.value = []
+  }
+
+  const { masterMode, masterId, masterName } = route.query
+
+  // 场景1: 新增主账户 (从 MasterAccountPicker "+" 进入)
+  if (masterMode === 'true' || masterMode === true) {
+    form.isMasterAccount = true
+    form.masterAccountName = null
+  }
+
+  // 场景2: 新增子账户 (从 SubAccountManager "+" 进入)
+  if (masterId || masterName) {
+    form.isMasterAccount = false
+    form.masterAccountName = masterName || ''
+    // 跟随主账户分组
+    if (masterName) {
+      const master = allAccounts.value.find(a => a.name === masterName)
+      if (master) {
+        form.accountGroup = master.accountGroup
+      }
+    }
+  }
+})
 
 async function save() {
   const validationError = validate()
