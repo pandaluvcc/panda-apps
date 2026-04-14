@@ -31,4 +31,7 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
 
     // 检查是否有账户引用了某个分组名
     boolean existsByAccountGroup(String accountGroup);
+
+    // 根据主账户名称查询所有子账户
+    List<Account> findByMasterAccountName(String masterAccountName);
 }

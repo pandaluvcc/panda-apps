@@ -121,6 +121,25 @@ public class AccountService {
         Account account = accountRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("账户不存在：" + id));
 
+        // 【主/子账户关联验证与分组级联】
+        // 如果设置主账户，验证主账户存在且为 master 类型，并同步分组
+        if (dto.getMasterAccountName() != null && !dto.getMasterAccountName().isEmpty()) {
+            Account master = accountRepository.findByName(dto.getMasterAccountName())
+                    .orElseThrow(() -> new RuntimeException("主账户不存在：" + dto.getMasterAccountName()));
+            if (!master.getIsMasterAccount()) {
+                throw new RuntimeException("指定的主账户[" + dto.getMasterAccountName() + "]不是主账户类型");
+            }
+            // 信用卡分组特殊：只能在同组内选择主账户
+            if ("信用卡".equals(master.getAccountGroup()) && !"信用卡".equals(dto.getAccountGroup())) {
+                throw new RuntimeException("信用卡分组的主账户只能选择信用卡分组内的账户");
+            }
+            // 子账户分组跟随主账户
+            dto.setAccountGroup(master.getAccountGroup());
+        } else if (dto.getMasterAccountName() == null && account.getMasterAccountName() != null) {
+            // 子账户解除主账户关联 → 不再是子账户
+            dto.setIsMasterAccount(false);
+        }
+
         account.setName(dto.getName());
         account.setAccountGroup(dto.getAccountGroup());
         account.setMainCurrency(dto.getMainCurrency());
@@ -145,7 +164,72 @@ public class AccountService {
         account.setRemark(dto.getRemark());
 
         Account saved = accountRepository.save(account);
+
+        // 【主账户分组变更：级联更新所有子账户分组】
+        Account beforeUpdate = accountRepository.findById(id).orElse(null);
+        if (beforeUpdate != null && Boolean.TRUE.equals(dto.getIsMasterAccount())) {
+            String oldGroup = beforeUpdate.getAccountGroup();
+            String newGroup = dto.getAccountGroup();
+            if (!newGroup.equals(oldGroup)) {
+                List<Account> subAccounts = accountRepository.findByMasterAccountName(account.getName());
+                for (Account sub : subAccounts) {
+                    sub.setAccountGroup(newGroup);
+                    accountRepository.save(sub);
+                }
+            }
+        }
+
+        // 【主账户取消主账户标记：解绑所有子账户】
+        if (Boolean.TRUE.equals(beforeUpdate.getIsMasterAccount()) &&
+            (dto.getIsMasterAccount() == null || !dto.getIsMasterAccount())) {
+            unlinkAllSubAccounts(account.getName());
+        }
+
         return AccountDTO.fromEntity(saved);
+    }
+
+    /**
+     * 解绑主账户的所有子账户（将子账户的 masterAccountName 设为 null）
+     */
+    private void unlinkAllSubAccounts(String masterName) {
+        List<Account> subs = accountRepository.findByMasterAccountName(masterName);
+        for (Account sub : subs) {
+            sub.setMasterAccountName(null);
+            accountRepository.save(sub);
+        }
+    }
+
+    /**
+     * 批量更新子账户请求 DTO
+     */
+    public static class BatchUpdateSubRequest {
+        private Long masterId;
+        private List<Long> subAccountIds;
+        private String action;  // "LINK" 或 "UNLINK"
+
+        public Long getMasterId() {
+            return masterId;
+        }
+
+        public void setMasterId(Long masterId) {
+            this.masterId = masterId;
+        }
+
+        public List<Long> getSubAccountIds() {
+            return subAccountIds;
+        }
+
+        public void setSubAccountIds(List<Long> subAccountIds) {
+            this.subAccountIds = subAccountIds;
+        }
+
+        public String getAction() {
+            return action;
+        }
+
+        public void setAction(String action) {
+            this.action = action;
+        }
     }
 
     /**
@@ -155,8 +239,60 @@ public class AccountService {
     public void archiveAccount(Long id) {
         Account account = accountRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("账户不存在：" + id));
+
+        // 归档主账户前解绑所有子账户
+        if (account.getIsMasterAccount()) {
+            unlinkAllSubAccounts(account.getName());
+        }
+
         account.setIsArchived(true);
         accountRepository.save(account);
+    }
+
+    /**
+     * 删除账户（软删除，同归档逻辑）
+     */
+    @Transactional
+    public void deleteAccount(Long id) {
+        Account account = accountRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("账户不存在：" + id));
+
+        // 删除主账户前解绑所有子账户
+        if (account.getIsMasterAccount()) {
+            unlinkAllSubAccounts(account.getName());
+        }
+
+        account.setIsArchived(true);
+        accountRepository.save(account);
+    }
+
+    /**
+     * 批量更新子账户（主子账户关联/解绑、分组同步）
+     */
+    @Transactional
+    public void batchUpdateSubAccounts(BatchUpdateSubRequest request) {
+        Account master = accountRepository.findById(request.getMasterId())
+                .orElseThrow(() -> new RuntimeException("主账户不存在：" + request.getMasterId()));
+        if (!master.getIsMasterAccount()) {
+            throw new RuntimeException("指定的主账户不是主账户类型");
+        }
+
+        for (Long subId : request.getSubAccountIds()) {
+            Account sub = accountRepository.findById(subId)
+                    .orElseThrow(() -> new RuntimeException("子账户不存在：" + subId));
+            if (sub.getIsMasterAccount()) {
+                throw new RuntimeException("账户[" + sub.getName() + "]是主账户，不能作为子账户");
+            }
+
+            if ("LINK".equals(request.getAction())) {
+                sub.setMasterAccountName(master.getName());
+                // 子账户分组跟随主账户
+                sub.setAccountGroup(master.getAccountGroup());
+            } else if ("UNLINK".equals(request.getAction())) {
+                sub.setMasterAccountName(null);
+            }
+            accountRepository.save(sub);
+        }
     }
 
     /**
