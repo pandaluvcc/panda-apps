@@ -2,6 +2,7 @@ package com.panda.snapledger.service;
 
 import com.panda.snapledger.controller.dto.AccountDTO;
 import com.panda.snapledger.controller.dto.AdjustmentDTO;
+import com.panda.snapledger.controller.dto.BatchUpdateSubRequest;
 import com.panda.snapledger.controller.dto.ReconciliationDTO;
 import com.panda.snapledger.controller.dto.TransactionDTO;
 import com.panda.snapledger.controller.dto.TransactionSummaryDTO;
@@ -28,6 +29,10 @@ import java.util.stream.Collectors;
  */
 @Service
 public class AccountService {
+
+    // 批量操作动作常量
+    private static final String ACTION_LINK = "LINK";
+    private static final String ACTION_UNLINK = "UNLINK";
 
     private final AccountRepository accountRepository;
     private final RecordRepository recordRepository;
@@ -122,6 +127,10 @@ public class AccountService {
                 .orElseThrow(() -> new RuntimeException("账户不存在：" + id));
 
         // 【主/子账户关联验证与分组级联】
+        // 保存旧状态用于后续变更检测
+        boolean wasMaster = account.getIsMasterAccount();
+        String oldGroup = account.getAccountGroup();
+
         // 如果设置主账户，验证主账户存在且为 master 类型，并同步分组
         if (dto.getMasterAccountName() != null && !dto.getMasterAccountName().isEmpty()) {
             Account master = accountRepository.findByName(dto.getMasterAccountName())
@@ -166,9 +175,7 @@ public class AccountService {
         Account saved = accountRepository.save(account);
 
         // 【主账户分组变更：级联更新所有子账户分组】
-        Account beforeUpdate = accountRepository.findById(id).orElse(null);
-        if (beforeUpdate != null && Boolean.TRUE.equals(dto.getIsMasterAccount())) {
-            String oldGroup = beforeUpdate.getAccountGroup();
+        if (wasMaster && Boolean.TRUE.equals(dto.getIsMasterAccount())) {
             String newGroup = dto.getAccountGroup();
             if (!newGroup.equals(oldGroup)) {
                 List<Account> subAccounts = accountRepository.findByMasterAccountName(account.getName());
@@ -180,8 +187,7 @@ public class AccountService {
         }
 
         // 【主账户取消主账户标记：解绑所有子账户】
-        if (Boolean.TRUE.equals(beforeUpdate.getIsMasterAccount()) &&
-            (dto.getIsMasterAccount() == null || !dto.getIsMasterAccount())) {
+        if (wasMaster && (dto.getIsMasterAccount() == null || !dto.getIsMasterAccount())) {
             unlinkAllSubAccounts(account.getName());
         }
 
@@ -196,39 +202,6 @@ public class AccountService {
         for (Account sub : subs) {
             sub.setMasterAccountName(null);
             accountRepository.save(sub);
-        }
-    }
-
-    /**
-     * 批量更新子账户请求 DTO
-     */
-    public static class BatchUpdateSubRequest {
-        private Long masterId;
-        private List<Long> subAccountIds;
-        private String action;  // "LINK" 或 "UNLINK"
-
-        public Long getMasterId() {
-            return masterId;
-        }
-
-        public void setMasterId(Long masterId) {
-            this.masterId = masterId;
-        }
-
-        public List<Long> getSubAccountIds() {
-            return subAccountIds;
-        }
-
-        public void setSubAccountIds(List<Long> subAccountIds) {
-            this.subAccountIds = subAccountIds;
-        }
-
-        public String getAction() {
-            return action;
-        }
-
-        public void setAction(String action) {
-            this.action = action;
         }
     }
 
@@ -284,11 +257,11 @@ public class AccountService {
                 throw new RuntimeException("账户[" + sub.getName() + "]是主账户，不能作为子账户");
             }
 
-            if ("LINK".equals(request.getAction())) {
+            if (ACTION_LINK.equals(request.getAction())) {
                 sub.setMasterAccountName(master.getName());
                 // 子账户分组跟随主账户
                 sub.setAccountGroup(master.getAccountGroup());
-            } else if ("UNLINK".equals(request.getAction())) {
+            } else if (ACTION_UNLINK.equals(request.getAction())) {
                 sub.setMasterAccountName(null);
             }
             accountRepository.save(sub);
