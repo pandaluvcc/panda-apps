@@ -70,18 +70,32 @@
 
           <transition name="slide-down">
             <div v-if="expandedGroups[group.name]" class="account-items">
-              <div
-                v-for="acc in group.accounts"
-                :key="acc.id"
-                :class="['account-row', { 'sub-account-row': acc.masterAccountName }]"
-                style="cursor: pointer"
-                @click="$router.push('/snap/account/' + acc.id)"
-              >
-                <span class="account-name">{{ acc.name }}</span>
-                <span :class="['account-balance', (acc.balance || 0) >= 0 ? 'amount-positive' : 'amount-negative']">
-                  {{ amountVisible ? formatFullBalance(acc.balance || 0) : '****' }}
-                </span>
-              </div>
+              <template v-for="acc in group.accounts" :key="acc.id">
+                <!-- 主账户行（带 children） -->
+                <div
+                  :class="['account-row', { 'master-account-row': acc.isMasterAccount }]"
+                  style="cursor: pointer"
+                  @click="$router.push('/snap/account/' + acc.id)"
+                >
+                  <span class="account-name">{{ acc.name }}</span>
+                  <span :class="['account-balance', (acc.balance || 0) >= 0 ? 'amount-positive' : 'amount-negative']">
+                    {{ amountVisible ? formatFullBalance(acc.balance || 0) : '****' }}
+                  </span>
+                </div>
+                <!-- 子账户列表（缩进） -->
+                <div
+                  v-for="sub in acc.children"
+                  :key="'sub-'+sub.id"
+                  class="account-row sub-account-row"
+                  style="cursor: pointer; padding-left: 32px"
+                  @click="$router.push('/snap/account/' + sub.id)"
+                >
+                  <span class="account-name">{{ sub.name }}</span>
+                  <span :class="['account-balance', (sub.balance || 0) >= 0 ? 'amount-positive' : 'amount-negative']">
+                    {{ amountVisible ? formatFullBalance(sub.balance || 0) : '****' }}
+                  </span>
+                </div>
+              </template>
             </div>
           </transition>
         </div>
@@ -106,6 +120,38 @@ const expandedGroups = reactive({})
 // 分组排序权重
 const GROUP_ORDER = ['第三方支付', '现金', '银行', '信用卡', '证券户', '其他', '归档']
 
+// 构建账户层级树：主账户 + children[] 子账户
+const accountHierarchy = computed(() => {
+  const masters = new Map()   // masterName -> { master, children: [] }
+  const independents = []     // 独立账户（非子账户）
+
+  for (const acc of accounts.value) {
+    if (acc.isArchived) continue
+
+    if (acc.isMasterAccount) {
+      masters.set(acc.name, { master: acc, children: [] })
+    } else if (acc.masterAccountName) {
+      // 子账户：找到其主账户并加入
+      const parent = masters.get(acc.masterAccountName)
+      if (parent) {
+        parent.children.push(acc)
+      } else {
+        // 主账户未找到或未加载：作为独立账户兜底
+        independents.push(acc)
+      }
+    } else {
+      independents.push(acc)
+    }
+  }
+
+  // 子账户按 sortOrder 排序
+  for (const { children } of masters.values()) {
+    children.sort((a, b) => (a.sortOrder || 999) - (b.sortOrder || 999))
+  }
+
+  return { masters, independents }
+})
+
 onMounted(async () => {
   try {
     const res = await getAccounts()
@@ -117,11 +163,32 @@ onMounted(async () => {
   }
 })
 
-// 账户分组逻辑
+// 账户分组逻辑（支持主子账户层级）
 const accountGroups = computed(() => {
   const groupMap = {}
 
-  for (const acc of accounts.value) {
+  // 遍历主账户及其子账户
+  for (const [masterName, { master, children }] of Object.entries(accountHierarchy.value.masters)) {
+    const isArchived = master.isArchived === true
+    const groupKey = isArchived ? '归档' : (master.accountGroup || '其他')
+
+    if (!groupMap[groupKey]) {
+      groupMap[groupKey] = { name: groupKey, accounts: [], balance: 0 }
+    }
+
+    // 主账户对象扩展 children 字段用于渲染
+    const masterDisplay = { ...master, children }
+    groupMap[groupKey].accounts.push(masterDisplay)
+
+    // 分组余额：主账户自身 + 所有子账户
+    if (master.includeInTotal !== false || isArchived) {
+      const subTotal = children.reduce((s, c) => s + (c.balance || 0), 0)
+      groupMap[groupKey].balance += (master.balance || 0) + subTotal
+    }
+  }
+
+  // 独立账户（非子账户）
+  for (const acc of accountHierarchy.value.independents) {
     const isArchived = acc.isArchived === true
     const groupKey = isArchived ? '归档' : (acc.accountGroup || '其他')
 
@@ -129,14 +196,18 @@ const accountGroups = computed(() => {
       groupMap[groupKey] = { name: groupKey, accounts: [], balance: 0 }
     }
     groupMap[groupKey].accounts.push(acc)
-    // 组内按 sortOrder 排序（后端已赋值，未知账户默认999）
-    groupMap[groupKey].accounts.sort((a, b) => (a.sortOrder || 999) - (b.sortOrder || 999))
+
     if (acc.includeInTotal !== false || isArchived) {
       groupMap[groupKey].balance += acc.balance || 0
     }
   }
 
-  // 排序：按 GROUP_ORDER 顺序，未列入的排到最后按字母序
+  // 组内排序：按 sortOrder
+  for (const group of Object.values(groupMap)) {
+    group.accounts.sort((a, b) => (a.sortOrder || 999) - (b.sortOrder || 999))
+  }
+
+  // 分组排序
   return Object.values(groupMap).sort((a, b) => {
     const ai = GROUP_ORDER.indexOf(a.name)
     const bi = GROUP_ORDER.indexOf(b.name)
@@ -147,19 +218,39 @@ const accountGroups = computed(() => {
   })
 })
 
-// 总资产：includeInTotal=true 且余额为正
-const totalAssets = computed(() =>
-  accounts.value
-    .filter(a => a.includeInTotal !== false && !a.isArchived && (a.balance || 0) > 0)
-    .reduce((sum, a) => sum + (a.balance || 0), 0)
-)
+// 总资产/总负债：基于主账户（含子账户）+ 独立账户
+const totalAssets = computed(() => {
+  let sum = 0
+  for (const { master, children } of Object.values(accountHierarchy.value.masters)) {
+    if (master.includeInTotal !== false && !master.isArchived) {
+      const subSum = children.reduce((s, c) => s + (c.balance || 0), 0)
+      sum += (master.balance || 0) + subSum
+    }
+  }
+  for (const acc of accountHierarchy.value.independents) {
+    if (acc.includeInTotal !== false && !acc.isArchived && (acc.balance || 0) > 0) {
+      sum += acc.balance || 0
+    }
+  }
+  return sum
+})
 
-// 总负债：includeInTotal=true 且余额为负
-const totalDebts = computed(() =>
-  accounts.value
-    .filter(a => a.includeInTotal !== false && !a.isArchived && (a.balance || 0) < 0)
-    .reduce((sum, a) => sum + (a.balance || 0), 0)
-)
+const totalDebts = computed(() => {
+  let sum = 0
+  for (const { master, children } of Object.values(accountHierarchy.value.masters)) {
+    if (master.includeInTotal !== false && !master.isArchived) {
+      const subSum = children.reduce((s, c) => s + (c.balance || 0), 0)
+      const total = (master.balance || 0) + subSum
+      if (total < 0) sum += total
+    }
+  }
+  for (const acc of accountHierarchy.value.independents) {
+    if (acc.includeInTotal !== false && !acc.isArchived && (acc.balance || 0) < 0) {
+      sum += acc.balance || 0
+    }
+  }
+  return sum
+})
 
 // 净值
 const netWorth = computed(() => totalAssets.value + totalDebts.value)
