@@ -12,9 +12,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import org.springframework.web.bind.annotation.*;
 
-import java.net.URI;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/snapledger/accounts")
@@ -22,9 +22,12 @@ import java.util.List;
 public class AccountController {
 
     private final AccountService accountService;
+    private final com.panda.snapledger.service.csvimport.MozeCsvImporter csvImporter;
 
-    public AccountController(AccountService accountService) {
+    public AccountController(AccountService accountService,
+                             com.panda.snapledger.service.csvimport.MozeCsvImporter csvImporter) {
         this.accountService = accountService;
+        this.csvImporter = csvImporter;
     }
 
     @GetMapping
@@ -115,6 +118,26 @@ public class AccountController {
             @Parameter(description = "账户 ID") @PathVariable Long id,
             @RequestBody AdjustmentDTO dto) {
         accountService.adjustBalance(id, dto);
+    }
+
+    @GetMapping("/{id}/diagnose")
+    @Operation(summary = "诊断账户余额计算明细")
+    public Map<String, Object> diagnoseBalance(@PathVariable Long id) {
+        return accountService.diagnoseBalance(id);
+    }
+
+    @PostMapping("/recalculate")
+    @Operation(summary = "重算所有账户余额")
+    public Map<String, Object> recalculateAll() {
+        int count = accountService.recalculateAllBalances();
+        return Map.of("message", "已重算 " + count + " 个账户余额", "count", count);
+    }
+
+    @PostMapping("/reclassify")
+    @Operation(summary = "重新分类所有账户（分组、排序、主子关系）")
+    public Map<String, Object> reclassifyAll() {
+        int count = csvImporter.reclassifyAllAccounts();
+        return Map.of("message", "已重新分类 " + count + " 个账户", "count", count);
     }
 
     @PutMapping("/{id}/reconcile")

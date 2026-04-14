@@ -64,7 +64,7 @@
               <span class="group-count">({{ group.accounts.length }})</span>
             </div>
             <span :class="['group-balance', group.balance >= 0 ? 'amount-positive' : 'amount-negative']">
-              {{ amountVisible ? formatBalanceSign(group.balance) : '****' }}
+              {{ amountVisible ? formatFullBalance(group.balance) : '****' }}
             </span>
           </div>
 
@@ -73,13 +73,13 @@
               <div
                 v-for="acc in group.accounts"
                 :key="acc.id"
-                class="account-row"
+                :class="['account-row', { 'sub-account-row': acc.masterAccountName }]"
                 style="cursor: pointer"
                 @click="$router.push('/snap/account/' + acc.id)"
               >
                 <span class="account-name">{{ acc.name }}</span>
                 <span :class="['account-balance', (acc.balance || 0) >= 0 ? 'amount-positive' : 'amount-negative']">
-                  {{ amountVisible ? formatBalanceSign(acc.balance || 0) : '****' }}
+                  {{ amountVisible ? formatFullBalance(acc.balance || 0) : '****' }}
                 </span>
               </div>
             </div>
@@ -104,7 +104,7 @@ const accounts = ref([])
 const expandedGroups = reactive({})
 
 // 分组排序权重
-const GROUP_ORDER = ['第三方支付', '现金', '银行', '信用卡', '证券户', '基金', '投资', '贷款']
+const GROUP_ORDER = ['第三方支付', '现金', '银行', '信用卡', '证券户', '其他', '归档']
 
 onMounted(async () => {
   try {
@@ -129,17 +129,15 @@ const accountGroups = computed(() => {
       groupMap[groupKey] = { name: groupKey, accounts: [], balance: 0 }
     }
     groupMap[groupKey].accounts.push(acc)
+    // 组内按 sortOrder 排序（后端已赋值，未知账户默认999）
+    groupMap[groupKey].accounts.sort((a, b) => (a.sortOrder || 999) - (b.sortOrder || 999))
     if (acc.includeInTotal !== false || isArchived) {
       groupMap[groupKey].balance += acc.balance || 0
     }
   }
 
-  // 排序：已知分组按 GROUP_ORDER，其他按字母，"其他"倒数第二，"归档"最后
+  // 排序：按 GROUP_ORDER 顺序，未列入的排到最后按字母序
   return Object.values(groupMap).sort((a, b) => {
-    if (a.name === '归档') return 1
-    if (b.name === '归档') return -1
-    if (a.name === '其他') return 1
-    if (b.name === '其他') return -1
     const ai = GROUP_ORDER.indexOf(a.name)
     const bi = GROUP_ORDER.indexOf(b.name)
     if (ai !== -1 && bi !== -1) return ai - bi
@@ -184,6 +182,15 @@ function formatBalanceSign(val) {
   const fmt = abs >= 10000
     ? (abs / 1000).toFixed(2).replace(/\.?0+$/, '') + 'K'
     : abs.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  if (n > 0) return '+¥' + fmt
+  if (n < 0) return '−¥' + fmt
+  return '¥0.00'
+}
+
+function formatFullBalance(val) {
+  const n = Number(val) || 0
+  const abs = Math.abs(n)
+  const fmt = abs.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
   if (n > 0) return '+¥' + fmt
   if (n < 0) return '−¥' + fmt
   return '¥0.00'
@@ -363,6 +370,10 @@ function formatBalanceSign(val) {
   padding: 0 16px 0 44px;
   height: 44px;
   border-top: 1px solid #F2F2F2;
+}
+
+.sub-account-row {
+  padding-left: 64px;
 }
 
 .account-name {

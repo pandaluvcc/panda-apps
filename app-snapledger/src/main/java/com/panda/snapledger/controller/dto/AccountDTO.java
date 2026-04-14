@@ -17,6 +17,7 @@ public class AccountDTO {
     private String icon;
     private String name;
     private String accountGroup;
+    private Integer sortOrder;
     private String mainCurrency;
     private BigDecimal balance;
     private BigDecimal initialBalance;
@@ -48,6 +49,7 @@ public class AccountDTO {
         dto.setIcon(account.getIcon());
         dto.setName(account.getName());
         dto.setAccountGroup(account.getAccountGroup());
+        dto.setSortOrder(account.getSortOrder());
         dto.setMainCurrency(account.getMainCurrency());
         dto.setBalance(account.getBalance());
         dto.setInitialBalance(account.getInitialBalance());

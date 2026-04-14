@@ -122,18 +122,190 @@ public class MozeCsvImporter {
         Set<String> existingNames = accountRepository.findAllNames();
         List<Account> newAccounts = new ArrayList<>();
 
-        for (String accountName : accounts) {
+        // 合并 CSV 中的账户和需确保存在的账户
+        Set<String> allNames = new HashSet<>(accounts);
+        allNames.addAll(ENSURE_ACCOUNTS);
+
+        for (String accountName : allNames) {
             if (!existingNames.contains(accountName)) {
                 Account account = new Account();
                 account.setName(accountName);
+                classifyAccount(account);
                 newAccounts.add(account);
             }
         }
 
         if (!newAccounts.isEmpty()) {
             accountRepository.saveAll(newAccounts);
-            log.info("新增{}个账户", newAccounts.size());
+            log.info("新增{}个账户（含{}个自动创建的关键账户）",
+                    newAccounts.size(), newAccounts.size() - accounts.size());
         }
+    }
+
+    // ====================== 账户分类目录 ======================
+    // 每个分组的有序账户列表：[账户名, 主账户名(null=无)]
+    // 列表中的位置即为 sortOrder
+
+    private static final String[][] CAT_PAYMENT = {
+        {"支付宝", null},
+        {"微信", null},
+        {"零钱", "微信"},
+    };
+    private static final String[][] CAT_CASH = {
+        {"钱包", null},
+        {"招行朝朝宝", null},
+    };
+    private static final String[][] CAT_BANK = {
+        {"上海银行", null},
+        {"兴业银行", null},
+        {"招商银行", null},
+        {"中信银行", null},
+    };
+    private static final String[][] CAT_CREDIT = {
+        {"招商银行信用卡", null},
+        {"广发银行信用卡", null},
+        {"上海银行信用卡", null},
+        {"美团月付", null},
+        {"抖音月付", null},
+        {"花呗", null},
+        {"借呗", null},
+        {"京东白条", null},
+    };
+    private static final String[][] CAT_SECURITIES = {
+        {"且慢", null},
+        {"盈米宝", "且慢"},
+        {"长赢", "且慢"},
+        {"货币三佳", "且慢"},
+        {"52 周攒钱计划", "且慢"},
+        {"12 攒钱计划", "且慢"},
+        {"雪球基金", null},
+        {"海外长钱", "雪球基金"},
+        {"长钱账户", "雪球基金"},
+        {"稳钱账户", "雪球基金"},
+        {"华宝证券", null},
+        {"我爸的", "华宝证券"},
+        {"我妈的", "华宝证券"},
+        {"我的", "华宝证券"},
+        {"易方达", null},
+        {"微众银行", null},
+        {"网商银行", null},
+        {"有知有行", null},
+        {"东方财富", null},
+    };
+    private static final String[][] CAT_OTHER = {
+        {"分期账款", null},
+        {"应收应付款项", null},
+        {"房产", null},
+    };
+    private static final String[][] CAT_ARCHIVED = {
+        {"兴业银行信用卡", null},
+        {"未还房租", null},
+    };
+
+    // 主账户集合
+    private static final Set<String> MASTER_ACCOUNTS = Set.of("微信", "且慢", "雪球基金", "华宝证券");
+
+    // 需确保存在的账户（主账户 + 关键顶层账户，即使 CSV 中无交易记录也自动创建）
+    private static final Set<String> ENSURE_ACCOUNTS = Set.of(
+            "支付宝", "微信", "且慢", "雪球基金", "华宝证券");
+
+    // 构建查找表：账户名 → {group, sortOrder, masterName, isArchived}
+    private static final java.util.Map<String, String[]> ACCOUNT_CATALOG = new java.util.HashMap<>();
+    static {
+        loadCatalog("第三方支付", CAT_PAYMENT, false);
+        loadCatalog("现金", CAT_CASH, false);
+        loadCatalog("银行", CAT_BANK, false);
+        loadCatalog("信用卡", CAT_CREDIT, false);
+        loadCatalog("证券户", CAT_SECURITIES, false);
+        loadCatalog("其他", CAT_OTHER, false);
+        loadCatalog("信用卡", CAT_ARCHIVED, true);  // 归档账户先按原类型分组
+    }
+
+    private static void loadCatalog(String group, String[][] entries, boolean archived) {
+        for (int i = 0; i < entries.length; i++) {
+            // {group, sortOrder, masterName, archived}
+            ACCOUNT_CATALOG.put(entries[i][0], new String[]{
+                    group, String.valueOf(i + 1), entries[i][1], String.valueOf(archived)});
+        }
+    }
+
+    /**
+     * 根据账户名自动分组、排序、标记信用账户/主账户/归档状态
+     * 优先从目录精确匹配，未命中则按规则推断
+     */
+    private void classifyAccount(Account account) {
+        String name = account.getName();
+
+        // 1. 目录精确匹配
+        String[] meta = ACCOUNT_CATALOG.get(name);
+        if (meta != null) {
+            account.setAccountGroup(meta[0]);
+            account.setSortOrder(Integer.parseInt(meta[1]));
+            if (meta[2] != null) {
+                account.setMasterAccountName(meta[2]);
+            }
+            if (MASTER_ACCOUNTS.contains(name)) {
+                account.setIsMasterAccount(true);
+            }
+            if ("true".equals(meta[3])) {
+                account.setIsArchived(true);
+            }
+            // 信用卡组标记
+            if ("信用卡".equals(meta[0])) {
+                account.setIsCreditAccount(true);
+            }
+            return;
+        }
+
+        // 2. 规则推断（未知账户兜底）
+        if (name.contains("信用卡") || name.contains("月付")
+                || name.contains("花呗") || name.contains("借呗") || name.contains("白条")) {
+            account.setAccountGroup("信用卡");
+            account.setIsCreditAccount(true);
+        } else if (name.contains("支付宝") || name.contains("微信")) {
+            account.setAccountGroup("第三方支付");
+        } else if (name.contains("钱包") || name.contains("朝朝宝")) {
+            account.setAccountGroup("现金");
+        } else if (name.contains("银行")) {
+            account.setAccountGroup("银行");
+        } else {
+            account.setAccountGroup("其他");
+        }
+    }
+
+    /**
+     * 对所有现有账户重新执行分类（分组、排序、主子关系、归档）
+     * 同时自动创建目录中定义的主账户（如支付宝、微信、且慢等）
+     */
+    @Transactional
+    public int reclassifyAllAccounts() {
+        // 1. 分类现有账户
+        List<Account> accounts = accountRepository.findAll();
+        Set<String> existingNames = new HashSet<>();
+        for (Account account : accounts) {
+            classifyAccount(account);
+            accountRepository.save(account);
+            existingNames.add(account.getName());
+        }
+
+        // 2. 自动创建不存在的关键账户（主账户及顶层账户）
+        log.info("现有账户名: {}", existingNames);
+        log.info("需确保存在的账户: {}", ENSURE_ACCOUNTS);
+        int created = 0;
+        for (String name : ENSURE_ACCOUNTS) {
+            boolean exists = existingNames.contains(name);
+            log.info("检查账户 [{}]: exists={}", name, exists);
+            if (!exists) {
+                Account account = new Account();
+                account.setName(name);
+                classifyAccount(account);
+                accountRepository.save(account);
+                created++;
+                log.info("自动创建账户: {} -> group={}, sortOrder={}", name, account.getAccountGroup(), account.getSortOrder());
+            }
+        }
+
+        return accounts.size() + created;
     }
 
     @Transactional
@@ -227,7 +399,7 @@ public class MozeCsvImporter {
         try {
             Record record = new Record();
 
-            record.setAccount(getValue(csvRecord, "账户"));
+            record.setAccount(cleanName(getValue(csvRecord, "账户")));
             record.setCurrency(getValue(csvRecord, "币种", "CNY"));
             record.setRecordType(getValue(csvRecord, "记录类型"));
             record.setMainCategory(getValue(csvRecord, "主类别"));
@@ -269,7 +441,7 @@ public class MozeCsvImporter {
             record.setProject(getValue(csvRecord, "项目"));
             record.setDescription(getValue(csvRecord, "描述"));
             record.setTags(getValue(csvRecord, "标签"));
-            record.setTarget(getValue(csvRecord, "对象"));
+            record.setTarget(cleanName(getValue(csvRecord, "对象")));
 
             return record;
         } catch (Exception e) {
@@ -289,6 +461,20 @@ public class MozeCsvImporter {
             }
         }
         return headers.length > 1 ? headers[headers.length - 1] : null;
+    }
+
+    /**
+     * 清洗名称：去除 Moze 导出中可能包含的特殊符号、图标字符、°等
+     * 保留中文、英文、数字、常用标点
+     */
+    private String cleanName(String name) {
+        if (name == null || name.isEmpty()) {
+            return name;
+        }
+        // 移除不可见控制字符、Emoji/图标（Supplementary区域）、°符号等
+        // 保留：中日韩文字、字母、数字、常用标点（·•·-—_ ()（）空格）
+        String cleaned = name.replaceAll("[°\\p{So}\\p{Sk}\\p{Cf}]", "").trim();
+        return cleaned.isEmpty() ? name : cleaned;
     }
 
     /**

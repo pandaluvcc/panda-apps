@@ -63,6 +63,7 @@ public class RecordService {
         }
         Record saved = recordRepository.save(record);
         refreshBalance(saved.getAccount());
+        refreshBalance(saved.getTarget());
         return RecordDTO.fromEntity(saved);
     }
 
@@ -87,12 +88,18 @@ public class RecordService {
         record.setCount(dto.getCount());
         record.setDescription(dto.getDescription());
         record.setTags(dto.getTags());
+        String oldTarget = record.getTarget();
         record.setTarget(dto.getTarget());
         RecordDTO result = RecordDTO.fromEntity(recordRepository.save(record));
         // 账户名变更时，新旧账户都要刷新
         refreshBalance(oldAccount);
         if (!oldAccount.equals(dto.getAccount())) {
             refreshBalance(dto.getAccount());
+        }
+        // target 变更时，新旧 target 都要刷新
+        refreshBalance(oldTarget);
+        if (oldTarget != null && !oldTarget.equals(dto.getTarget())) {
+            refreshBalance(dto.getTarget());
         }
         return result;
     }
@@ -102,8 +109,10 @@ public class RecordService {
         Record record = recordRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("记录不存在: " + id));
         String accountName = record.getAccount();
+        String targetName = record.getTarget();
         recordRepository.delete(record);
         refreshBalance(accountName);
+        refreshBalance(targetName);
     }
 
     /** 重算并持久化指定账户余额，账户不存在时静默跳过 */

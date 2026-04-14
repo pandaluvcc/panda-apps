@@ -19,6 +19,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -45,9 +46,35 @@ public class AccountService {
      * 过滤逻辑由调用方（前端）按场景自行处理
      */
     public List<AccountDTO> listAccounts() {
-        return accountRepository.findAll(Sort.by("accountGroup", "name")).stream()
+        return accountRepository.findAll(Sort.by("accountGroup", "sortOrder", "name")).stream()
                 .map(AccountDTO::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 重算所有账户余额
+     */
+    @Transactional
+    public int recalculateAllBalances() {
+        List<Account> accounts = accountRepository.findAll();
+        for (Account account : accounts) {
+            BigDecimal initial = account.getInitialBalance() != null
+                    ? account.getInitialBalance() : BigDecimal.ZERO;
+            account.setBalance(balanceService.calculateBalance(account.getName(), initial));
+            accountRepository.save(account);
+        }
+        return accounts.size();
+    }
+
+    /**
+     * 诊断账户余额计算明细
+     */
+    public Map<String, Object> diagnoseBalance(Long id) {
+        Account account = accountRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("账户不存在：" + id));
+        BigDecimal initial = account.getInitialBalance() != null
+                ? account.getInitialBalance() : BigDecimal.ZERO;
+        return balanceService.diagnoseBalance(account.getName(), initial);
     }
 
     /**

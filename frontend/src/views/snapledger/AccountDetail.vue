@@ -263,57 +263,57 @@
         </div>
       </template>
     </div>
+
+    <!-- 账单周期跳转选择器 -->
+    <van-popup v-model:show="showPeriodPicker" position="bottom" round>
+      <van-picker
+        v-model="periodPickerValue"
+        :columns="periodPickerColumns"
+        title="选择账单周期"
+        @confirm="onPeriodPickerConfirm"
+        @cancel="showPeriodPicker = false"
+      />
+    </van-popup>
+
+    <!-- 账单周期选择器（居中滑块） -->
+    <van-popup v-model:show="showBillCyclePicker" position="center" :style="{ width: '85%', borderRadius: '16px' }">
+      <div class="slide-picker">
+        <div class="slide-picker-title">账单周期</div>
+        <div class="slide-picker-preview">{{ previewBillCycleRange }}</div>
+        <div class="slide-picker-track">
+          <input
+            type="range" min="1" max="28"
+            v-model.number="tempBillCycleDay"
+            class="cycle-slider"
+            :style="sliderFillStyle"
+          />
+        </div>
+        <div class="slide-picker-label">账单日：每月第 {{ tempBillCycleDay }} 日</div>
+        <div class="slide-picker-footer">
+          <button class="slide-btn" @click="showBillCyclePicker = false">取消</button>
+          <button class="slide-btn" @click="confirmBillCycleDay">确定</button>
+        </div>
+      </div>
+    </van-popup>
+
+    <!-- 到期还款日选择器（每月第几日） -->
+    <van-popup v-model:show="showCreditDueDatePicker" position="bottom" round>
+      <van-picker
+        v-model="creditDueDatePickerVal"
+        :columns="creditDueDayColumns"
+        title="到期还款日"
+        @confirm="onCreditDueDateConfirm"
+        @cancel="showCreditDueDatePicker = false"
+      />
+    </van-popup>
+
+    <!-- 账户分组选择器 -->
+    <AccountGroupPicker
+      v-model:show="showGroupPicker"
+      :modelValue="infoForm.accountGroup"
+      @update:modelValue="val => { infoForm.accountGroup = val; autoSave() }"
+    />
   </div>
-
-  <!-- 账单周期跳转选择器 -->
-  <van-popup v-model:show="showPeriodPicker" position="bottom" round>
-    <van-picker
-      v-model="periodPickerValue"
-      :columns="periodPickerColumns"
-      title="选择账单周期"
-      @confirm="onPeriodPickerConfirm"
-      @cancel="showPeriodPicker = false"
-    />
-  </van-popup>
-
-  <!-- 账单周期选择器（居中滑块） -->
-  <van-popup v-model:show="showBillCyclePicker" position="center" :style="{ width: '85%', borderRadius: '16px' }">
-    <div class="slide-picker">
-      <div class="slide-picker-title">账单周期</div>
-      <div class="slide-picker-preview">{{ previewBillCycleRange }}</div>
-      <div class="slide-picker-track">
-        <input
-          type="range" min="1" max="28"
-          v-model.number="tempBillCycleDay"
-          class="cycle-slider"
-          :style="sliderFillStyle"
-        />
-      </div>
-      <div class="slide-picker-label">账单日：每月第 {{ tempBillCycleDay }} 日</div>
-      <div class="slide-picker-footer">
-        <button class="slide-btn" @click="showBillCyclePicker = false">取消</button>
-        <button class="slide-btn" @click="confirmBillCycleDay">确定</button>
-      </div>
-    </div>
-  </van-popup>
-
-  <!-- 到期还款日选择器（每月第几日） -->
-  <van-popup v-model:show="showCreditDueDatePicker" position="bottom" round>
-    <van-picker
-      v-model="creditDueDatePickerVal"
-      :columns="creditDueDayColumns"
-      title="到期还款日"
-      @confirm="onCreditDueDateConfirm"
-      @cancel="showCreditDueDatePicker = false"
-    />
-  </van-popup>
-
-  <!-- 账户分组选择器 -->
-  <AccountGroupPicker
-    v-model:show="showGroupPicker"
-    :modelValue="infoForm.accountGroup"
-    @update:modelValue="val => { infoForm.accountGroup = val; autoSave() }"
-  />
 </template>
 
 <script setup>

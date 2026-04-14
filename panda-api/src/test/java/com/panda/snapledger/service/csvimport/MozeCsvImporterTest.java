@@ -60,7 +60,7 @@ class MozeCsvImporterTest {
 
         assertEquals(2, recordRepository.count());
         assertTrue(accountRepository.existsByName("招商银行信用卡"));
-        assertTrue(accountRepository.existsByName("招商银行°"));
+        assertTrue(accountRepository.existsByName("招商银行"));
 
         Category expenseCat = categoryRepository.findByMainCategoryAndSubCategoryAndType("饮食", "午餐", "支出");
         assertNotNull(expenseCat);
@@ -133,9 +133,9 @@ class MozeCsvImporterTest {
 
         mozeCsvImporter.importFromCsv(file);
 
-        assertTrue(accountRepository.existsByName("招商银行°"));
+        assertTrue(accountRepository.existsByName("招商银行"));
 
         Record record = recordRepository.findAll().get(0);
-        assertEquals("招商银行°", record.getAccount());
+        assertEquals("招商银行", record.getAccount());
     }
 }

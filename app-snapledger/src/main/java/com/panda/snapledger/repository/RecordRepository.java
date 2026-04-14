@@ -57,6 +57,9 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
     // 按账户查询（按日期时间倒序）
     List<Record> findByAccountOrderByDateDescTimeDesc(String account);
 
+    // 按 target 和对账状态排除查询（用于余额计算中的手动转账记录）
+    List<Record> findByTargetAndReconciliationStatusNot(String target, String status);
+
     // 双向查询转账类记录，按日期时间倒序
     // 转账类 recordType：转账/还款/转出/转入/应付款项/应收款项/分期还款
     @Query("SELECT r FROM Record r WHERE (r.account = :account OR r.target = :account) " +

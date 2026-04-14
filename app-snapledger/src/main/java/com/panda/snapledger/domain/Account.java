@@ -28,6 +28,9 @@ public class Account {
     @Column(name = "account_group", length = 50)
     private String accountGroup;
 
+    @Column(name = "sort_order")
+    private Integer sortOrder = 999;
+
     @Column(name = "main_currency", length = 10)
     private String mainCurrency = "CNY";
 
