@@ -277,6 +277,42 @@ Moze CSV 导入的记录包含 13 种 `recordType`，系统按以下矩阵分类
 
 **Moze CSV 转账格式**：Moze 导出的转账/还款记录使用 `转出`/`转入` 成对记录（各一侧），`对象` 字段为空。手动录入的转账使用 `转账`/`还款` 类型，有 `target` 字段。
 
+## Master-Sub Account Management
+
+账户支持主子账户层级关系，用于资金归集和分组管理。
+
+### 核心字段
+
+- `isMasterAccount` (boolean): 标记账户是否为主账户
+- `masterAccountName` (string): 子账户所属主账户的名称（空表示独立账户）
+
+### 分组级联规则
+
+1. **子账户关联时**：子账户的 `accountGroup` 自动跟随主账户的分组
+2. **主账户分组变更时**：所有子账户的分组自动同步到主账户的新分组
+3. **信用卡分组特殊限制**：信用卡分组的主账户只能选择信用卡分组内的账户作为子账户（前端筛选限制）
+
+### 余额统计规则
+
+- **主账户余额** = 自身余额 + 所有直接子账户余额之和
+- **分组余额** = 该分组下所有主账户余额（已包含其子账户）之和 + 独立账户余额之和（子账户不重复计入）
+
+### 归档/删除规则
+
+- 归档或删除主账户时，自动解绑所有子账户
+- 子账户变为独立账户，不受影响
+
+### 相关 API
+
+`PUT /api/snapledger/accounts/{masterId}/sub-accounts/batch`
+- 批量关联/解绑子账户
+- 请求体: `{ action: "LINK"|"UNLINK", subAccountIds: number[] }`
+
+### 前端组件
+
+- `MasterAccountPicker`: 主账户选择器（支持"无"、现有主账户列表、快速创建）
+- `SubAccountManager`: 子账户批量管理（多选、批量解绑、快速跳转创建）
+
 ## Code Style Guidelines
 
 ### Java
