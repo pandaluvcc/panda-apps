@@ -2,6 +2,7 @@ package com.panda.snapledger.controller;
 
 import com.panda.snapledger.controller.dto.AccountDTO;
 import com.panda.snapledger.controller.dto.AdjustmentDTO;
+import com.panda.snapledger.controller.dto.BatchUpdateSubRequest;
 import com.panda.snapledger.controller.dto.ReconciliationDTO;
 import com.panda.snapledger.controller.dto.TransactionDTO;
 import com.panda.snapledger.controller.dto.TransactionSummaryDTO;
@@ -150,5 +151,18 @@ public class AccountController {
             @Parameter(description = "账户 ID") @PathVariable Long id,
             @RequestBody ReconciliationDTO dto) {
         accountService.reconcile(id, dto);
+    }
+
+    @PutMapping("/{masterId}/sub-accounts/batch")
+    @Operation(summary = "批量更新子账户（关联/解绑）")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "成功更新子账户"),
+        @ApiResponse(responseCode = "404", description = "主账户不存在")
+    })
+    public void batchUpdateSubAccounts(
+            @Parameter(description = "主账户 ID") @PathVariable Long masterId,
+            @RequestBody BatchUpdateSubRequest request) {
+        request.setMasterId(masterId);
+        accountService.batchUpdateSubAccounts(request);
     }
 }
