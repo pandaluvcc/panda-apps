@@ -422,28 +422,52 @@ public AccountDTO updateAccount(Long id, AccountDTO dto) {
     accountRepository.save(account);
     return AccountDTO.fromEntity(account);
 }
+
+// 分组修改的级联更新（在 updateAccount 内部，保存 account 后）
+if (dto.getAccountGroup() != null && !dto.getAccountGroup().equals(account.getAccountGroup())) {
+    // 如果该账户是主账户，同步更新所有子账户的分组
+    if (Boolean.TRUE.equals(account.getIsMasterAccount())) {
+        List<Account> subs = accountRepository.findByMasterAccountName(account.getName());
+        for (Account sub : subs) {
+            sub.setAccountGroup(dto.getAccountGroup());
+            accountRepository.save(sub);
+        }
+    }
+}
 ```
 
 #### 5.2.2 主账户删除/归档时的自动解绑
 
-在 `AccountService.archiveAccount` 和删除逻辑中，自动解绑所有子账户：
+在 `AccountService` 中，删除或归档主账户时，自动将其所有子账户的 `masterAccountName` 设为 `null`：
 
 ```java
+// 通用解绑方法
+private void unlinkAllSubAccounts(String masterName) {
+    List<Account> subs = accountRepository.findByMasterAccountName(masterName);
+    for (Account sub : subs) {
+        sub.setMasterAccountName(null);
+        accountRepository.save(sub);
+    }
+}
+
 @Transactional
 public void archiveAccount(Long id) {
     Account account = accountRepository.findById(id).orElseThrow(...);
-    
-    // 如果是主账户，解绑所有子账户
     if (Boolean.TRUE.equals(account.getIsMasterAccount())) {
-        List<Account> subs = accountRepository.findByMasterAccountName(account.getName());
-        for (Account sub : subs) {
-            sub.setMasterAccountName(null);
-            accountRepository.save(sub);
-        }
+        unlinkAllSubAccounts(account.getName());
     }
-    
     account.setIsArchived(true);
     accountRepository.save(account);
+}
+
+// 删除账户（如果允许删除）
+@Transactional
+public void deleteAccount(Long id) {
+    Account account = accountRepository.findById(id).orElseThrow(...);
+    if (Boolean.TRUE.equals(account.getIsMasterAccount())) {
+        unlinkAllSubAccounts(account.getName());
+    }
+    accountRepository.delete(account);
 }
 ```
 
@@ -462,11 +486,7 @@ public void batchUpdateSubAccounts(
         Account sub = accountRepository.findById(subId)
             .orElseThrow(() -> new RuntimeException("子账户不存在"));
         
-        // 确保该子账户原本属于此主账户（可选校验）
-        if (!master.getName().equals(sub.getMasterAccountName())) {
-            // 跨主账户移动：旧主账户的子账户列表会自动减少，无需额外处理
-        }
-        
+        // 将该子账户绑定到主账户（可能从其他主账户迁移而来）
         sub.setMasterAccountName(master.getName());
         sub.setAccountGroup(master.getAccountGroup());  // 分组跟随
         accountRepository.save(sub);
