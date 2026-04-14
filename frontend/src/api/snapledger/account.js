@@ -27,3 +27,7 @@ export function getAccountSummary(id, startDate, endDate) {
     params: { startDate, endDate }
   })
 }
+
+export function batchUpdateSubAccounts(masterId, data) {
+  return api.put(`/snapledger/accounts/${masterId}/sub-accounts/batch`, data)
+}
