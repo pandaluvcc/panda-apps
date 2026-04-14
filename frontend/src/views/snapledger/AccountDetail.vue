@@ -212,9 +212,12 @@
                 <span class="form-label">额度共享</span>
                 <input v-model="infoForm.creditLimitSharing" class="form-input" placeholder="无" @blur="autoSave" />
               </div>
-              <div class="form-item form-item--sub">
+              <div class="form-item form-item--sub form-item--picker" @click="showMasterPicker = true">
                 <span class="form-label">主账户</span>
-                <input v-model="infoForm.masterAccountName" class="form-input" placeholder="无" @blur="autoSave" />
+                <div class="form-picker-value">
+                  <span>{{ infoForm.masterAccountName || '无' }}</span>
+                  <span class="picker-arrow">›</span>
+                </div>
               </div>
               <div class="form-item form-item--sub">
                 <span class="form-label">自动扣缴</span>
@@ -233,6 +236,14 @@
                 <span class="form-value">{{ interestFreeDays }}天</span>
               </div>
             </template>
+          </div>
+
+          <!-- 子账户管理（仅主账户显示） -->
+          <div v-if="account?.isMasterAccount" class="form-section sub-mgmt-section">
+            <div class="section-header">
+              <span class="section-title">子账户管理</span>
+            </div>
+            <SubAccountManager :masterId="account.id" :masterName="account.name" />
           </div>
 
           <!-- 其他设置 -->
@@ -313,6 +324,14 @@
       :modelValue="infoForm.accountGroup"
       @update:modelValue="val => { infoForm.accountGroup = val; autoSave() }"
     />
+
+    <!-- 主账户选择器 -->
+    <MasterAccountPicker
+      v-model:show="showMasterPicker"
+      :modelValue="infoForm.masterAccountName"
+      :creditGroupOnly="infoForm.accountGroup === '信用卡'"
+      @update:modelValue="onMasterChange"
+    />
   </div>
 </template>
 
@@ -323,6 +342,8 @@ import { showToast } from 'vant'
 import { useAccountForm } from '@/composables/useAccountForm'
 import { getAccount, updateAccount, getAccountSummary, getAccountTransactions } from '@/api'
 import AccountGroupPicker from '@/components/snapledger/AccountGroupPicker.vue'
+import MasterAccountPicker from '@/components/snapledger/MasterAccountPicker.vue'
+import SubAccountManager from '@/components/snapledger/SubAccountManager.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -562,6 +583,9 @@ const autoSaving = ref(false)
 // 账户分组选择器
 const showGroupPicker = ref(false)
 
+// 主账户选择器
+const showMasterPicker = ref(false)
+
 // 账单周期选择器（滑块）
 const showBillCyclePicker = ref(false)
 const tempBillCycleDay = ref(1)
@@ -658,6 +682,11 @@ function confirmBillCycleDay() {
   if (endMonth > 12) { endMonth = 1; endYear += 1 }
   infoForm.billCycleEnd = `${endYear}-${pad(endMonth)}-${pad(endDay)}`
   showBillCyclePicker.value = false
+  autoSave()
+}
+
+function onMasterChange(val) {
+  infoForm.masterAccountName = val
   autoSave()
 }
 
