@@ -68,7 +68,6 @@ const router = useRouter()
 const allAccounts = ref([])
 const selectedIds = ref([])
 const showConfirm = ref(false)
-const pendingAction = ref(null)
 
 onMounted(async () => {
   try {
@@ -103,13 +102,11 @@ function goAddSub() {
 
 function batchUnlink() {
   if (selectedIds.value.length === 0) return
-  pendingAction.value = 'UNLINK'
   showConfirm.value = true
 }
 
 function unlinkSingle(id) {
   selectedIds.value = [id]
-  pendingAction.value = 'UNLINK'
   showConfirm.value = true
 }
 
