@@ -59,7 +59,14 @@ MASTER_ACCOUNTS = {"微信", "且慢", "雪球基金", "华宝证券"}
 | 信用卡 | **仅限本分组**（信用卡分组）的未归档主账户 |
 | 其他分组（第三方支付/银行/证券户/其他） | **所有分组**的未归档主账户 |
 
-**业务逻辑**：信用卡分组的账户只能关联本分组的主账户（可能是基于风控或账单处理考虑），其他分组无此限制。
+**主账户选择器范围规则**：
+
+| 当前子账户分组 | 可选择的主账户范围 |
+|----------------|-------------------|
+| 信用卡 | **仅限本分组**（信用卡分组）的未归档且 `isMasterAccount=true` 的主账户 |
+| 其他分组（第三方支付/银行/证券户/其他） | **所有分组**的未归档且 `isMasterAccount=true` 的主账户 |
+
+**关键约束**：主账户选择器**只显示已标记为主账户的账户**（`isMasterAccount=true`），不显示普通账户。选中即关联，不会自动提升普通账户为主账户。
 
 ### 3.3 余额统计防重复
 
@@ -80,7 +87,7 @@ independentBalance = account.balance
 
 ## 四、前端组件设计
 
-### 4.1 AccountDetail.vue - 增强账户信息表单
+### 4.1 AccountDetail.vue - 增强账户信息表单 + 分组跟随
 
 **新增字段**：在信用账户字段组后插入"主账户"行
 
@@ -105,16 +112,26 @@ independentBalance = account.balance
 **API 调用**：
 ```javascript
 // 保存主账户关联
-async function saveMasterAccount(masterName) {
-  const payload = { ...toPayload(), masterAccountName: masterName }
-  if (masterName) {
-    payload.isMasterAccount = false  // 确保子账户标记
-    // 可选：同时将被选中的账户设为主账户
-    await updateAccount(masterName, { isMasterAccount: true })
+async function saveMasterAccount(masterName, masterGroup) {
+  // 1. 更新当前子账户：设为主账户的子账户，分组跟随主账户
+  const payload = { 
+    masterAccountName: masterName,
+    accountGroup: masterGroup,  // 分组跟随
+    isMasterAccount: false
   }
   await updateAccount(route.params.id, payload)
+  
+  // 2. 如果选中的是已存在主账户，确保其 isMasterAccount=true（通常已设置）
+  if (masterName) {
+    await updateAccountByName(masterName, { isMasterAccount: true })
+  }
 }
 ```
+
+**分组跟随规则**：
+- 子账户的 `accountGroup` 自动同步为主账户的 `accountGroup`
+- 后端需在更新 `masterAccountName` 时自动调整子账户的分组
+- 主账户修改分组时，其所有子账户的分组同步更新
 
 ### 4.2 MasterAccountPicker.vue（新增组件）
 
@@ -371,30 +388,97 @@ async function save() {
 - `GET /api/snapledger/accounts` → 返回所有账户（包含 `isMasterAccount`、`masterAccountName`）
 - `PUT /api/snapledger/accounts/{id}` → 更新账户，支持修改 `masterAccountName`
 
-### 5.2 可选新增接口
+### 5.2 后端关键逻辑调整
 
-**批量更新子账户归属**（如果前端批量保存性能敏感）：
+#### 5.2.1 更新账户时的分组跟随
+
+在 `AccountService.updateAccount` 中，当 `masterAccountName` 被修改时，自动同步子账户的分组：
 
 ```java
-@PutMapping("/{id}/sub-accounts")
-public void updateSubAccounts(
-    @PathVariable Long id,
-    @RequestBody List<SubAccountLinkRequest> requests) {
+@Transactional
+public AccountDTO updateAccount(Long id, AccountDTO dto) {
+    Account account = accountRepository.findById(id).orElseThrow(...);
     
-    Account master = accountRepository.findById(id)
-        .orElseThrow(() -> new RuntimeException("账户不存在"));
+    // ... 原有字段更新
     
-    for (SubAccountLinkRequest req : requests) {
-        Account sub = accountRepository.findById(req.getSubAccountId())
+    // 如果设置了主账户归属，同步分组
+    if (dto.getMasterAccountName() != null) {
+        Account master = accountRepository.findByName(dto.getMasterAccountName());
+        if (master != null) {
+            account.setAccountGroup(master.getAccountGroup());  // 分组跟随
+        }
+    }
+    
+    // 主账户校验：isMasterAccount=true 时 masterAccountName 必须为空
+    if (Boolean.TRUE.equals(dto.getIsMasterAccount()) && dto.getMasterAccountName() != null) {
+        throw new IllegalArgumentException("主账户不能设置主账户归属");
+    }
+    
+    // 循环引用预防：不能将自己设为主账户的子账户
+    if (dto.getMasterAccountName() != null && dto.getMasterAccountName().equals(account.getName())) {
+        throw new IllegalArgumentException("不能将自己设为主账户");
+    }
+    
+    accountRepository.save(account);
+    return AccountDTO.fromEntity(account);
+}
+```
+
+#### 5.2.2 主账户删除/归档时的自动解绑
+
+在 `AccountService.archiveAccount` 和删除逻辑中，自动解绑所有子账户：
+
+```java
+@Transactional
+public void archiveAccount(Long id) {
+    Account account = accountRepository.findById(id).orElseThrow(...);
+    
+    // 如果是主账户，解绑所有子账户
+    if (Boolean.TRUE.equals(account.getIsMasterAccount())) {
+        List<Account> subs = accountRepository.findByMasterAccountName(account.getName());
+        for (Account sub : subs) {
+            sub.setMasterAccountName(null);
+            accountRepository.save(sub);
+        }
+    }
+    
+    account.setIsArchived(true);
+    accountRepository.save(account);
+}
+```
+
+#### 5.2.3 批量更新子账户归属接口（SubAccountManager 使用）
+
+```java
+@PutMapping("/{masterId}/sub-accounts/batch")
+public void batchUpdateSubAccounts(
+    @PathVariable Long masterId,
+    @RequestBody BatchUpdateSubRequest request) {
+    
+    Account master = accountRepository.findById(masterId)
+        .orElseThrow(() -> new RuntimeException("主账户不存在"));
+    
+    for (Long subId : request.getSubAccountIds()) {
+        Account sub = accountRepository.findById(subId)
             .orElseThrow(() -> new RuntimeException("子账户不存在"));
         
-        if (req.getIsLinked()) {
-            sub.setMasterAccountName(master.getName());
-        } else {
-            sub.setMasterAccountName(null);
-            sub.setIsMasterAccount(false);  // 确保标记正确
+        // 确保该子账户原本属于此主账户（可选校验）
+        if (!master.getName().equals(sub.getMasterAccountName())) {
+            // 跨主账户移动：旧主账户的子账户列表会自动减少，无需额外处理
         }
+        
+        sub.setMasterAccountName(master.getName());
+        sub.setAccountGroup(master.getAccountGroup());  // 分组跟随
         accountRepository.save(sub);
+    }
+    
+    // 取消选中的子账户（不在列表中的原子账户）→ 解绑
+    List<Account> allSubs = accountRepository.findByMasterAccountName(master.getName());
+    for (Account sub : allSubs) {
+        if (!request.getSubAccountIds().contains(sub.getId())) {
+            sub.setMasterAccountName(null);
+            accountRepository.save(sub);
+        }
     }
 }
 ```
@@ -402,44 +486,59 @@ public void updateSubAccounts(
 **DTO**：
 ```java
 @Data
-public class SubAccountLinkRequest {
-    private Long subAccountId;
-    private Boolean isLinked;
+public class BatchUpdateSubRequest {
+    private List<Long> subAccountIds;  // 选中的子账户ID列表
 }
 ```
 
-### 5.3 余额计算调整
+#### 5.2.4 分组修改时的级联更新
 
-**AccountBalanceService 需调整**：
+主账户修改分组时，自动更新其所有子账户：
+
 ```java
-public BigDecimal calculateMasterAccountBalance(String masterName, BigDecimal initial) {
-    // 主账户余额 = 自身初始余额 + 自身交易 + 所有子账户交易
-    BigDecimal balance = initial;
-    balance = balance.add(calculateBalanceFromRecords(masterName));
-    
-    // 累加子账户
-    List<Account> subs = accountRepository.findByMasterAccountName(masterName);
+// 在 updateAccount 中，检测 accountGroup 变化
+String oldGroup = account.getAccountGroup();
+account.setAccountGroup(dto.getAccountGroup());
+accountRepository.save(account);
+
+// 如果该账户是主账户，同步更新所有子账户的分组
+if (Boolean.TRUE.equals(account.getIsMasterAccount())) {
+    List<Account> subs = accountRepository.findByMasterAccountName(account.getName());
     for (Account sub : subs) {
-        BigDecimal subInitial = sub.getInitialBalance() != null ? sub.getInitialBalance() : BigDecimal.ZERO;
-        balance = balance.add(calculateBalanceFromRecords(sub.getName(), subInitial));
+        sub.setAccountGroup(dto.getAccountGroup());
+        accountRepository.save(sub);
     }
-    return balance;
 }
 ```
 
-**分组余额计算**（Home.vue 前端计算或后端提供接口）：
+### 5.3 余额计算说明
+
+当前 `Account.balance` 字段已通过 `AccountBalanceService` 实时计算，包含该账户自身所有交易。
+
+**主账户余额展示**：前端展示时，若 `isMasterAccount=true`，可通过额外请求获取子账户列表后在前端求和：
 ```javascript
-// 前端计算（推荐保持简单，后端只返回单账户余额）
-groupBalance = 0
-for (acc of groupAccounts) {
-  if (acc.isMasterAccount) {
-    // 主账户：余额已包含子账户
-    groupBalance += acc.balance
-  } else if (!acc.masterAccountName) {
-    // 独立账户
-    groupBalance += acc.balance
+// AccountDetail 主账户视图
+const masterBalance = computed(() => {
+  let sum = account.value.balance  // 主账户自身
+  for (const sub of subAccounts.value) {
+    sum += sub.balance || 0
   }
-  // 子账户：跳过，已计入主账户
+  return sum
+})
+```
+
+或后端提供 `/accounts/{id}/balance-with-subs` 聚合接口（可选优化）。
+
+**分组余额展示**（Home.vue）：
+```javascript
+groupBalance = 0
+for (const acc of group.accounts) {
+  if (acc.isMasterAccount) {
+    groupBalance += acc.balance  // 主账户余额已含子账户
+  } else if (!acc.masterAccountName) {
+    groupBalance += acc.balance  // 独立账户
+  }
+  // 子账户跳过，已计入主账户
 }
 ```
 
@@ -625,9 +724,10 @@ async function save() {
 
 | 场景 | 处理方式 |
 |------|----------|
-| 删除主账户 | 前端禁用删除，或删除前将所有子账户 `masterAccountName` 设为 `null` |
-| 归档主账户 | 允许归档，子账户仍显示关联（但主账户在总览中隐藏） |
-| 子账户的分组与主账户不同 | 总览页按主账户分组展示，子账户跟随主账户分组显示 |
+| 删除主账户 | **B. 自动解绑**：删除/归档时，后端将主账户的所有子账户的 `masterAccountName` 设为 `null`，子账户在详情页显示"无" |
+| 归档主账户 | 同上，归档时自动解绑所有子账户，子账户显示"无"（主账户在总览中隐藏） |
+| 子账户的分组与主账户不同 | **分组跟随**：子账户的 `accountGroup` 自动变更为与主账户一致。在 Home 页展示时，子账户跟随主账户的分组显示（无论其原分组是什么） |
+| 主账户修改分组 | 主账户分组修改后，其所有子账户的 `accountGroup` 自动同步更新 |
 | 主账户选择器中找不到目标主账户 | 检查是否归档、是否在主账户列表中 |
 | 子账户的 `masterAccountName` 指向一个不存在的账户 | 详情页显示"无"，点击可重新选择 |
 | 主账户的 `masterAccountName` 非空（数据错误） | 前端忽略，显示为主账户，保存时清空 `masterAccountName` |
@@ -710,16 +810,19 @@ public AccountDTO updateAccount(Long id, AccountDTO dto) {
 
 ---
 
-## 十一、开放问题
+## 十一、已决问题
 
-| # | 问题 | 状态 | 决定 |
-|---|------|------|------|
-| 1 | 主账户选择器是否自动提升普通账户为主账户？ | ✅ 待确认 | 推荐：是（选中即 `isMasterAccount=true`） |
-| 2 | 新增主账户后，是否自动关联到当前子账户？ | ✅ 已选 B（自动关联） | 通过路由参数返回并自动设置 |
-| 3 | 子账户取消关联后变成什么状态？ | ✅ 已选 A（独立账户） | `masterAccountName=null` |
-| 4 | 主账户余额是否包含子账户（防重复）？ | ✅ 已确认 | 包含，子账户不再单独计入分组余额 |
-| 5 | 选择器显示范围（信用卡分组限制） | ✅ 已确认 | 信用卡仅本分组，其他显示所有主账户 |
-| 6 | 新增主账户页面字段范围 | ✅ 已确认 | 4个核心字段，强制 `isMasterAccount=true` |
+| # | 问题 | 决定 |
+|---|------|------|
+| 1 | 主账户选择器是否自动提升普通账户为主账户？ | **否**，只显示 `isMasterAccount=true` 的账户 |
+| 2 | 新增主账户后，是否自动关联到当前子账户？ | **是**，通过路由参数返回并自动设置 |
+| 3 | 子账户取消关联后变成什么状态？ | **独立账户**，`masterAccountName=null` |
+| 4 | 余额统计是否防重复？ | **是**，主账户含子账户，子账户不计入分组 |
+| 5 | 主账户选择器显示范围（信用卡分组限制） | **信用卡仅本分组**，其他显示所有未归档主账户 |
+| 6 | 新增主账户页面字段范围 | **4个核心字段**，强制 `isMasterAccount=true` |
+| 7 | 删除/归档主账户时子账户如何处理？ | **自动解绑**，子账户 `masterAccountName=null` |
+| 8 | 子账户的分组是否跟随主账户？ | **是**，子账户 `accountGroup` 自动同步主账户分组 |
+| 9 | 子账户能否是信用账户？ | **可以**，信用卡子账户不受影响 |
 
 ---
 
