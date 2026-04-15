@@ -104,7 +104,10 @@ public class MozeCsvImporter {
             return new ImportResult(0, 0, 0, skippedCount);
         }
 
-        // 批量保存账户和分类
+        // === 步骤1：保存前，记录已存在的账户名（用于后续重新分类） ===
+        Set<String> preExistingNames = accountRepository.findAllNames();
+
+        // 批量保存账户和分类（新账户自动分类）
         saveAccountsBatch(accounts);
         saveCategoriesBatch(categories);
 
@@ -113,6 +116,35 @@ public class MozeCsvImporter {
 
         // 重新计算所有受影响账户的余额
         recalculateBalances(accounts);
+
+        // === 步骤2：对相关账户重新应用分类规则 ===
+        // 重新分类范围：
+        //  a) CSV 中出现且导入前已存在的账户（修正可能缺失的主子账户关系）
+        //  b) 所有预设主账户（确保它们始终被正确标记为 isMasterAccount=true）
+        Set<String> namesToReclassify = new HashSet<>(accounts);
+        namesToReclassify.retainAll(preExistingNames); // 交集：CSV中出现且已存在
+        namesToReclassify.addAll(ENSURE_ACCOUNTS);     // 加上所有预设主账户
+
+        if (!namesToReclassify.isEmpty()) {
+            List<Account> accountsToUpdate = accountRepository.findByNameIn(namesToReclassify);
+            for (Account acc : accountsToUpdate) {
+                classifyAccount(acc);
+                accountRepository.save(acc);
+            }
+            log.info("CSV导入：重新分类{}个账户（含主账户）", accountsToUpdate.size());
+        }
+
+        // === 步骤3：确保预设的主账户存在（理论上已由 saveAccountsBatch 创建，此处作最终保障） ===
+        Set<String> allNamesNow = accountRepository.findAllNames();
+        for (String masterName : ENSURE_ACCOUNTS) {
+            if (!allNamesNow.contains(masterName)) {
+                Account master = new Account();
+                master.setName(masterName);
+                classifyAccount(master);
+                accountRepository.save(master);
+                log.info("CSV导入：自动创建缺失主账户 {}", masterName);
+            }
+        }
 
         return new ImportResult(savedCount, accounts.size(), categories.size(), skippedCount);
     }
@@ -150,6 +182,9 @@ public class MozeCsvImporter {
         {"支付宝", null},
         {"微信", null},
         {"零钱", "微信"},
+        {"余额宝", "支付宝"},
+        {"余利宝", "支付宝"},
+        {"小荷包", "支付宝"},
     };
     private static final String[][] CAT_CASH = {
         {"钱包", null},
@@ -177,7 +212,7 @@ public class MozeCsvImporter {
         {"长赢", "且慢"},
         {"货币三佳", "且慢"},
         {"52 周攒钱计划", "且慢"},
-        {"12 攒钱计划", "且慢"},
+        {"12 \uFE0F攒钱计划", "且慢"},
         {"雪球基金", null},
         {"海外长钱", "雪球基金"},
         {"长钱账户", "雪球基金"},
@@ -203,7 +238,7 @@ public class MozeCsvImporter {
     };
 
     // 主账户集合
-    private static final Set<String> MASTER_ACCOUNTS = Set.of("微信", "且慢", "雪球基金", "华宝证券");
+    private static final Set<String> MASTER_ACCOUNTS = Set.of("支付宝", "微信", "且慢", "雪球基金", "华宝证券");
 
     // 需确保存在的账户（主账户 + 关键顶层账户，即使 CSV 中无交易记录也自动创建）
     private static final Set<String> ENSURE_ACCOUNTS = Set.of(
@@ -231,45 +266,96 @@ public class MozeCsvImporter {
 
     /**
      * 根据账户名自动分组、排序、标记信用账户/主账户/归档状态
-     * 优先从目录精确匹配，未命中则按规则推断
+     * 优先从目录精确匹配，未命中则按规则推断主子关系
      */
     private void classifyAccount(Account account) {
         String name = account.getName();
 
-        // 1. 目录精确匹配
+        // 1. 目录精确匹配：明确设置所有分类字段
         String[] meta = ACCOUNT_CATALOG.get(name);
         if (meta != null) {
             account.setAccountGroup(meta[0]);
             account.setSortOrder(Integer.parseInt(meta[1]));
-            if (meta[2] != null) {
-                account.setMasterAccountName(meta[2]);
-            }
-            if (MASTER_ACCOUNTS.contains(name)) {
-                account.setIsMasterAccount(true);
-            }
+            // 显式设置主账户关联：meta[2] 为 null 表示无主账户
+            account.setMasterAccountName(meta[2] != null ? meta[2] : null);
+            // 根据 MASTER_ACCOUNTS 集合设置是否为主账户
+            account.setIsMasterAccount(MASTER_ACCOUNTS.contains(name));
+            // 归档状态：仅在目录明确为 true 时设置，false 时保留原值（避免覆盖用户手动归档）
             if ("true".equals(meta[3])) {
                 account.setIsArchived(true);
             }
-            // 信用卡组标记
-            if ("信用卡".equals(meta[0])) {
-                account.setIsCreditAccount(true);
+            // 信用卡分组标记
+            account.setIsCreditAccount("信用卡".equals(meta[0]));
+            return;
+        }
+
+        // 2. 主账户推断（基于名称包含关系）：仅对已知主账户集合中的主账户建立关联
+        String potentialMaster = getPotentialMaster(name);
+        if (potentialMaster != null) {
+            // 该账户是子账户，设置主账户关联
+            account.setMasterAccountName(potentialMaster);
+            account.setIsMasterAccount(false);
+            // 从主账户的目录条目获取分组
+            String[] masterMeta = ACCOUNT_CATALOG.get(potentialMaster);
+            if (masterMeta != null) {
+                account.setAccountGroup(masterMeta[0]);
+                account.setSortOrder(999);
+                // 如果主账户在信用卡分组，子账户也标记为信用卡
+                account.setIsCreditAccount("信用卡".equals(masterMeta[0]));
+            } else {
+                // 主账户不在目录中，使用关键词推断分组
+                String group = inferGroupByKeywords(name);
+                account.setAccountGroup(group);
+                account.setSortOrder(999);
+                account.setIsCreditAccount("信用卡".equals(group));
             }
             return;
         }
 
-        // 2. 规则推断（未知账户兜底）
-        if (name.contains("信用卡") || name.contains("月付")
-                || name.contains("花呗") || name.contains("借呗") || name.contains("白条")) {
-            account.setAccountGroup("信用卡");
-            account.setIsCreditAccount(true);
+        // 3. 未知账户：补充分组信息，不覆盖主账户关联字段
+        if (account.getAccountGroup() == null || account.getAccountGroup().isEmpty()) {
+            account.setAccountGroup(inferGroupByKeywords(name));
+        }
+        if (account.getSortOrder() == null) {
+            account.setSortOrder(999);
+        }
+        // 确保 isCreditAccount 与分组一致
+        account.setIsCreditAccount("信用卡".equals(account.getAccountGroup()));
+    }
+
+    /**
+     * 从账户名推断潜在的主账户（通过名称包含关系）
+     * 仅考虑 MASTER_ACCOUNTS 中定义的已知主账户
+     */
+    private String getPotentialMaster(String name) {
+        // 如果账户名本身是主账户，不设为子账户
+        if (MASTER_ACCOUNTS.contains(name)) {
+            return null;
+        }
+        // 名称包含匹配：找到第一个包含关系的主账户
+        for (String master : MASTER_ACCOUNTS) {
+            if (name.contains(master)) {
+                return master;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 根据关键词推断账户分组（用于未知账户兜底）
+     */
+    private String inferGroupByKeywords(String name) {
+        if (name.contains("信用卡") || name.contains("月付") ||
+            name.contains("花呗") || name.contains("借呗") || name.contains("白条")) {
+            return "信用卡";
         } else if (name.contains("支付宝") || name.contains("微信")) {
-            account.setAccountGroup("第三方支付");
+            return "第三方支付";
         } else if (name.contains("钱包") || name.contains("朝朝宝")) {
-            account.setAccountGroup("现金");
+            return "现金";
         } else if (name.contains("银行")) {
-            account.setAccountGroup("银行");
+            return "银行";
         } else {
-            account.setAccountGroup("其他");
+            return "其他";
         }
     }
 

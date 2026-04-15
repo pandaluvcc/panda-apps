@@ -24,6 +24,7 @@ import SnapScan from '@/views/snapledger/Scan.vue'
 import SnapStats from '@/views/snapledger/Stats.vue'
 import SnapBudget from '@/views/snapledger/Budget.vue'
 import SnapAccountDetail from '@/views/snapledger/AccountDetail.vue'
+import SnapSubAccountList from '@/views/snapledger/SubAccountList.vue'
 
 const routes = [
   // 根路由 - 应用首页
@@ -95,6 +96,12 @@ const routes = [
     path: '/snap/account/:id',
     name: 'SnapAccountDetail',
     component: SnapAccountDetail,
+    meta: { module: 'snapledger', transition: 'page-slide' }
+  },
+  {
+    path: '/snap/account/:id/sub-accounts',
+    name: 'SnapSubAccountList',
+    component: SnapSubAccountList,
     meta: { module: 'snapledger', transition: 'page-slide' }
   },
   {

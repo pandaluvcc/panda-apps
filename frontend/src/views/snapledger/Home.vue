@@ -61,7 +61,7 @@
             <div class="group-left">
               <span class="expand-btn">{{ expandedGroups[group.name] ? '−' : '+' }}</span>
               <span class="group-name">{{ group.name }}</span>
-              <span class="group-count">({{ group.accounts.length }})</span>
+              <span class="group-count">({{ group.totalCount }})</span>
             </div>
             <span :class="['group-balance', group.balance >= 0 ? 'amount-positive' : 'amount-negative']">
               {{ amountVisible ? formatFullBalance(group.balance) : '****' }}
@@ -87,7 +87,7 @@
                   v-for="sub in acc.children"
                   :key="'sub-'+sub.id"
                   class="account-row sub-account-row"
-                  style="cursor: pointer; padding-left: 32px"
+                  style="cursor: pointer"
                   @click="$router.push('/snap/account/' + sub.id)"
                 >
                   <span class="account-name">{{ sub.name }}</span>
@@ -163,22 +163,24 @@ onMounted(async () => {
   }
 })
 
-// 账户分组逻辑（支持主子账户层级）
+// 账户分组逻辑（支持主子账户层级，包含子账户计数）
 const accountGroups = computed(() => {
   const groupMap = {}
 
-  // 遍历主账户及其子账户
-  for (const [masterName, { master, children }] of Object.entries(accountHierarchy.value.masters)) {
+  // 遍历主账户及其子账户（Map 用 for...of 遍历）
+  for (const [masterName, { master, children }] of accountHierarchy.value.masters.entries()) {
     const isArchived = master.isArchived === true
     const groupKey = isArchived ? '归档' : (master.accountGroup || '其他')
 
     if (!groupMap[groupKey]) {
-      groupMap[groupKey] = { name: groupKey, accounts: [], balance: 0 }
+      groupMap[groupKey] = { name: groupKey, accounts: [], balance: 0, totalCount: 0 }
     }
 
     // 主账户对象扩展 children 字段用于渲染
     const masterDisplay = { ...master, children }
     groupMap[groupKey].accounts.push(masterDisplay)
+    // 计数：只算子账户，主账户不计入总数
+    groupMap[groupKey].totalCount += children.length
 
     // 分组余额：主账户自身 + 所有子账户
     if (master.includeInTotal !== false || isArchived) {
@@ -193,9 +195,11 @@ const accountGroups = computed(() => {
     const groupKey = isArchived ? '归档' : (acc.accountGroup || '其他')
 
     if (!groupMap[groupKey]) {
-      groupMap[groupKey] = { name: groupKey, accounts: [], balance: 0 }
+      groupMap[groupKey] = { name: groupKey, accounts: [], balance: 0, totalCount: 0 }
     }
     groupMap[groupKey].accounts.push(acc)
+    // 独立账户计1个
+    groupMap[groupKey].totalCount += 1
 
     if (acc.includeInTotal !== false || isArchived) {
       groupMap[groupKey].balance += acc.balance || 0
@@ -221,7 +225,7 @@ const accountGroups = computed(() => {
 // 总资产/总负债：基于主账户（含子账户）+ 独立账户
 const totalAssets = computed(() => {
   let sum = 0
-  for (const { master, children } of Object.values(accountHierarchy.value.masters)) {
+  for (const { master, children } of accountHierarchy.value.masters.values()) {
     if (master.includeInTotal !== false && !master.isArchived) {
       const subSum = children.reduce((s, c) => s + (c.balance || 0), 0)
       sum += (master.balance || 0) + subSum
@@ -237,7 +241,7 @@ const totalAssets = computed(() => {
 
 const totalDebts = computed(() => {
   let sum = 0
-  for (const { master, children } of Object.values(accountHierarchy.value.masters)) {
+  for (const { master, children } of accountHierarchy.value.masters.values()) {
     if (master.includeInTotal !== false && !master.isArchived) {
       const subSum = children.reduce((s, c) => s + (c.balance || 0), 0)
       const total = (master.balance || 0) + subSum

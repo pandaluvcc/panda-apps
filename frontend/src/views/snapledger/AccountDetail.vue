@@ -160,7 +160,7 @@
       <!-- 账户信息 tab -->
       <template v-else-if="activeTab === '账户信息'">
         <div class="info-form">
-          <!-- 基本信息 -->
+          <!-- 基础信息（所有账户类型都显示） -->
           <div class="form-section">
             <div class="form-item">
               <span class="form-label">名称</span>
@@ -181,17 +181,36 @@
               <span class="form-label">初始余额</span>
               <input v-model.number="infoForm.initialBalance" class="form-input" type="number" placeholder="0" @blur="autoSave" />
             </div>
-            <div class="form-item form-item--picker" @click="openBillCyclePicker">
+            <!-- 子账户：账单周期跟随主账户，只读显示 -->
+            <div v-if="isSubAccount" class="form-item">
+              <span class="form-label">账单周期</span>
+              <span class="form-value">{{ billCycleInfoDisplay }}</span>
+            </div>
+            <!-- 主账户/普通账户：可编辑账单周期 -->
+            <div v-else class="form-item form-item--picker" @click="openBillCyclePicker">
               <span class="form-label">账单周期</span>
               <div class="form-picker-value">
                 <span>{{ billCycleInfoDisplay }}</span>
                 <span class="picker-arrow">›</span>
               </div>
             </div>
+            <!-- 子账户：显示主账户 -->
+            <div v-if="isSubAccount" class="form-item">
+              <span class="form-label">主账户</span>
+              <span class="form-value">{{ masterAccountName }}</span>
+            </div>
+            <!-- 主账户：子账户入口 -->
+            <div v-if="account?.isMasterAccount" class="form-item form-item--picker" @click="goToSubAccounts">
+              <span class="form-label">子账户</span>
+              <div class="form-picker-value">
+                <span>{{ subAccountCount }}组账户</span>
+                <span class="picker-arrow">›</span>
+              </div>
+            </div>
           </div>
 
-          <!-- 信用账户及子字段 -->
-          <div class="form-section">
+          <!-- 信用账户专属字段（仅非主账户显示） -->
+          <div v-if="account && !account.isMasterAccount" class="form-section">
             <div class="form-item form-item--switch">
               <span class="form-label">信用账户</span>
               <van-switch v-model="infoForm.isCreditAccount" size="22" @update:modelValue="autoSave" />
@@ -238,16 +257,8 @@
             </template>
           </div>
 
-          <!-- 子账户管理（仅主账户显示） -->
-          <div v-if="account?.isMasterAccount" class="form-section sub-mgmt-section">
-            <div class="section-header">
-              <span class="section-title">子账户管理</span>
-            </div>
-            <SubAccountManager :masterId="account.id" :masterName="account.name" />
-          </div>
-
-          <!-- 其他设置 -->
-          <div class="form-section">
+          <!-- 其他设置（仅非主账户显示） -->
+          <div v-if="account && !account.isMasterAccount" class="form-section">
             <div class="form-item">
               <span class="form-label">返利回馈</span>
               <input v-model="infoForm.cashbackInfo" class="form-input" placeholder="无" @blur="autoSave" />
@@ -262,7 +273,7 @@
             </div>
           </div>
 
-          <!-- 备注 -->
+          <!-- 备注（所有账户类型都显示） -->
           <div class="form-section">
             <div class="form-item">
               <span class="form-label">备注</span>
@@ -340,7 +351,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { useAccountForm } from '@/composables/useAccountForm'
-import { getAccount, updateAccount, getAccountSummary, getAccountTransactions } from '@/api'
+import { getAccount, updateAccount, getAccountSummary, getAccountTransactions, getAccounts as getAllAccounts } from '@/api'
 import AccountGroupPicker from '@/components/snapledger/AccountGroupPicker.vue'
 import MasterAccountPicker from '@/components/snapledger/MasterAccountPicker.vue'
 import SubAccountManager from '@/components/snapledger/SubAccountManager.vue'
@@ -351,6 +362,9 @@ const router = useRouter()
 // Account data
 const account = ref(null)
 const activeTab = ref('交易明细')
+
+// 所有账户列表（用于查找主账户和子账户）
+const allAccounts = ref([])
 
 // Period state
 const periodStart = ref('')
@@ -666,6 +680,20 @@ const sliderFillStyle = computed(() => {
   return { background: `linear-gradient(to right, #1989fa ${pct}%, #e5e5e5 ${pct}%)` }
 })
 
+// 判断是否为子账户
+const isSubAccount = computed(() => {
+  return account.value && !account.value.isMasterAccount && account.value.masterAccountName
+})
+
+// 子账户数量（用于显示）
+const subAccountCount = computed(() => {
+  if (!account.value?.isMasterAccount) return 0
+  return allAccounts.value.filter(a => a.masterAccountName === account.value.name).length
+})
+
+// 主账户名称（子账户显示）
+const masterAccountName = computed(() => account.value?.masterAccountName || '')
+
 function openBillCyclePicker() {
   tempBillCycleDay.value = getCycleDayFromForm() || 1
   showBillCyclePicker.value = true
@@ -690,13 +718,43 @@ function onMasterChange(val) {
   autoSave()
 }
 
-watch(account, (acc) => {
-  if (acc) loadFromAccount(acc)
+function goToSubAccounts() {
+  router.push(`/snap/account/${account.value.id}/sub-accounts`)
+}
+
+watch(account, async (acc) => {
+  if (acc) {
+    loadFromAccount(acc)
+    // 子账户：账单周期跟随主账户（覆盖从后端加载的周期）
+    if (isSubAccount.value && masterAccountName.value) {
+      const master = allAccounts.value.find(a => a.name === masterAccountName.value)
+      if (master) {
+        infoForm.billCycleStart = master.billCycleStart || null
+        infoForm.billCycleEnd = master.billCycleEnd || null
+      }
+    }
+    // 刷新所有账户列表（子账户管理可能改变了关系）
+    try {
+      allAccounts.value = await getAllAccounts()
+    } catch (e) {
+      console.warn('Failed to refresh accounts list:', e)
+    }
+  }
 }, { immediate: true })
 
 async function autoSave() {
   const err = validate()
   if (err) { showToast(err); return }
+
+  // 子账户：账单周期跟随主账户（清空本地设置，使用主账户的）
+  if (isSubAccount.value && masterAccountName.value) {
+    const master = allAccounts.value.find(a => a.name === masterAccountName.value)
+    if (master) {
+      infoForm.billCycleStart = master.billCycleStart || null
+      infoForm.billCycleEnd = master.billCycleEnd || null
+    }
+  }
+
   autoSaving.value = true
   try {
     const updated = await updateAccount(route.params.id, toPayload())
@@ -719,8 +777,14 @@ function handleBack() {
 
 onMounted(async () => {
   try {
-    account.value = await getAccount(route.params.id)
-    const { start, end } = computeDefaultPeriod(account.value)
+    // 并行加载当前账户和所有账户列表
+    const [currentAccount, accountsList] = await Promise.all([
+      getAccount(route.params.id),
+      getAllAccounts()
+    ])
+    account.value = currentAccount
+    allAccounts.value = accountsList
+    const { start, end } = computeDefaultPeriod(currentAccount)
     periodStart.value = start
     periodEnd.value = end
     await Promise.all([loadStats(), loadTransactions()])
@@ -863,6 +927,12 @@ onMounted(async () => {
 .form-item--sub { padding-left: 32px; background: #fafafa; }
 .autosave-tip {
   text-align: center; font-size: 12px; color: #999; padding: 8px 0 16px;
+}
+
+.form-hint {
+  font-size: 12px;
+  color: #999;
+  margin-left: 8px;
 }
 /* 账单周期滑块选择器 */
 .slide-picker { padding: 24px 24px 20px; }
