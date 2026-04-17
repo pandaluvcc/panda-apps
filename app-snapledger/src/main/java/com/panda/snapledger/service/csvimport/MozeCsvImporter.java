@@ -28,8 +28,10 @@ import java.time.format.DateTimeFormatter;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -111,11 +113,21 @@ public class MozeCsvImporter {
         saveAccountsBatch(accounts);
         saveCategoriesBatch(categories);
 
+        // 写入账户初始余额（必须在保存流水前，以便重算时拿到正确的底数）
+        applyInitialBalances();
+
+        // 标记"不纳入总余额"的账户（如房产）
+        applyExcludeFromTotal();
+
         // 分批保存记录
         int savedCount = saveRecordsBatch(records);
 
-        // 重新计算所有受影响账户的余额
-        recalculateBalances(accounts);
+        // 重新计算所有受影响账户的余额（含所有有初始余额的账户、所有主账户，避免本次 CSV 缺流水时漏算，
+        // 且避免主账户 balance 字段残留历史脏值）
+        Set<String> accountsToRecalc = new HashSet<>(accounts);
+        accountsToRecalc.addAll(INITIAL_BALANCES.keySet());
+        accountsToRecalc.addAll(MASTER_ACCOUNTS);
+        recalculateBalances(accountsToRecalc);
 
         // === 步骤2：对相关账户重新应用分类规则 ===
         // 重新分类范围：
@@ -171,6 +183,69 @@ public class MozeCsvImporter {
             accountRepository.saveAll(newAccounts);
             log.info("新增{}个账户（含{}个自动创建的关键账户）",
                     newAccounts.size(), newAccounts.size() - accounts.size());
+        }
+    }
+
+    // ====================== 不纳入总余额的账户（非流动资产） ======================
+    // 这些账户依然显示在账户总览，但不计入头部"总资产/总负债"统计。
+    // 场景：房产等非流动性资产，与 Moze 行为对齐。
+    private static final Set<String> EXCLUDE_FROM_TOTAL = Set.of("房产");
+
+    @Transactional
+    public void applyExcludeFromTotal() {
+        List<Account> toSave = new ArrayList<>();
+        for (String name : EXCLUDE_FROM_TOTAL) {
+            accountRepository.findByName(name).ifPresent(acc -> {
+                if (!Boolean.FALSE.equals(acc.getIncludeInTotal())) {
+                    acc.setIncludeInTotal(false);
+                    toSave.add(acc);
+                }
+            });
+        }
+        if (!toSave.isEmpty()) {
+            accountRepository.saveAll(toSave);
+            log.info("已将{}个账户标记为不纳入总余额", toSave.size());
+        }
+    }
+
+    // ====================== 账户初始余额（Moze 原始值，流水外的开户底数） ======================
+    // Moze CSV 只含流水，不含初始余额。以下常量保证每次导入后账户余额与 Moze 一致。
+    // 未列出的账户初始余额默认 0。
+    private static final Map<String, BigDecimal> INITIAL_BALANCES = new HashMap<>();
+    static {
+        INITIAL_BALANCES.put("余额宝", new BigDecimal("171.07"));
+        INITIAL_BALANCES.put("余利宝", new BigDecimal("75.47"));
+        INITIAL_BALANCES.put("零钱", new BigDecimal("13.56"));
+        INITIAL_BALANCES.put("招商银行", new BigDecimal("282.48"));
+        INITIAL_BALANCES.put("借呗", new BigDecimal("13000"));
+        INITIAL_BALANCES.put("盈米宝", new BigDecimal("0.04"));
+        INITIAL_BALANCES.put("长赢", new BigDecimal("43570.48"));
+        INITIAL_BALANCES.put("我爸的", new BigDecimal("2129.04"));
+        INITIAL_BALANCES.put("我妈的", new BigDecimal("1787.08"));
+        INITIAL_BALANCES.put("微众银行", new BigDecimal("10000.64"));
+        INITIAL_BALANCES.put("网商银行", new BigDecimal("17533.01"));
+    }
+
+    /**
+     * 将 INITIAL_BALANCES 写入对应账户（若账户存在）。
+     * 调用点：saveAccountsBatch 之后、recalculateBalances 之前。
+     * 用户在账户详情手动改过的 initialBalance 会被覆盖，这是刻意行为 —— Moze 是唯一权威数据源。
+     */
+    @Transactional
+    public void applyInitialBalances() {
+        List<Account> toSave = new ArrayList<>();
+        for (Map.Entry<String, BigDecimal> entry : INITIAL_BALANCES.entrySet()) {
+            accountRepository.findByName(entry.getKey()).ifPresent(acc -> {
+                BigDecimal target = entry.getValue();
+                if (acc.getInitialBalance() == null || acc.getInitialBalance().compareTo(target) != 0) {
+                    acc.setInitialBalance(target);
+                    toSave.add(acc);
+                }
+            });
+        }
+        if (!toSave.isEmpty()) {
+            accountRepository.saveAll(toSave);
+            log.info("已写入{}个账户的初始余额", toSave.size());
         }
     }
 

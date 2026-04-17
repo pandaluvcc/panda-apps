@@ -34,4 +34,7 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
 
     // 根据主账户名称查询所有子账户
     List<Account> findByMasterAccountName(String masterAccountName);
+
+    // 按名称集合批量查询账户
+    List<Account> findByNameIn(Set<String> names);
 }

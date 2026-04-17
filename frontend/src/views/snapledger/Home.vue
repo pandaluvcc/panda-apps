@@ -73,11 +73,14 @@
               <template v-for="acc in group.accounts" :key="acc.id">
                 <!-- 主账户行（带 children） -->
                 <div
-                  :class="['account-row', { 'master-account-row': acc.isMasterAccount }]"
-                  style="cursor: pointer"
-                  @click="$router.push('/snap/account/' + acc.id)"
+                  :class="['account-row', { 'master-account-row': acc.isMasterAccount, 'virtual-account-row': acc.isVirtual }]"
+                  :style="{ cursor: acc.isVirtual ? 'default' : 'pointer' }"
+                  @click="!acc.isVirtual && $router.push('/snap/account/' + acc.id)"
                 >
-                  <span class="account-name">{{ acc.name }}</span>
+                  <div class="account-name-wrap">
+                    <span class="account-name">{{ acc.name }}</span>
+                    <span v-if="acc.subtitle" class="account-subtitle">{{ acc.subtitle }}</span>
+                  </div>
                   <span :class="['account-balance', (acc.balance || 0) >= 0 ? 'amount-positive' : 'amount-negative']">
                     {{ amountVisible ? formatFullBalance(acc.balance || 0) : '****' }}
                   </span>
@@ -115,10 +118,36 @@ const activeTab = ref(0)
 const amountVisible = ref(true)
 const loading = ref(true)
 const accounts = ref([])
-const expandedGroups = reactive({})
+
+// 分组展开状态持久化到 localStorage（默认全部折叠，用户展开后记忆）
+const EXPANDED_GROUPS_KEY = 'snapledger:home:expandedGroups'
+const loadExpandedGroups = () => {
+  try {
+    return JSON.parse(localStorage.getItem(EXPANDED_GROUPS_KEY) || '{}')
+  } catch {
+    return {}
+  }
+}
+const expandedGroups = reactive(loadExpandedGroups())
 
 // 分组排序权重
 const GROUP_ORDER = ['第三方支付', '现金', '银行', '信用卡', '证券户', '其他', '归档']
+
+// 虚拟账户：非真实账户实体，仅作展示占位。后续真实功能接入后替换 balance 来源即可。
+// 放在"其他"分组。isVirtual=true 用于跳过路由跳转。
+const VIRTUAL_ACCOUNTS = [
+  {
+    id: 'virtual-receivable-payable',
+    name: '应收应付款项',
+    subtitle: '追踪你的借还款历史',
+    balance: -37842.18,
+    accountGroup: '其他',
+    isVirtual: true,
+    includeInTotal: true,
+    isArchived: false,
+    sortOrder: 9999
+  }
+]
 
 // 构建账户层级树：主账户 + children[] 子账户
 const accountHierarchy = computed(() => {
@@ -176,16 +205,19 @@ const accountGroups = computed(() => {
       groupMap[groupKey] = { name: groupKey, accounts: [], balance: 0, totalCount: 0 }
     }
 
-    // 主账户对象扩展 children 字段用于渲染
-    const masterDisplay = { ...master, children }
+    // 主账户余额 = 自身 + 所有子账户（符合 CLAUDE.md 规则）
+    const subTotal = children.reduce((s, c) => s + (c.balance || 0), 0)
+    const aggregatedBalance = (master.balance || 0) + subTotal
+
+    // 主账户对象扩展 children 字段用于渲染，balance 替换为聚合值
+    const masterDisplay = { ...master, children, balance: aggregatedBalance }
     groupMap[groupKey].accounts.push(masterDisplay)
     // 计数：只算子账户，主账户不计入总数
     groupMap[groupKey].totalCount += children.length
 
     // 分组余额：主账户自身 + 所有子账户
     if (master.includeInTotal !== false || isArchived) {
-      const subTotal = children.reduce((s, c) => s + (c.balance || 0), 0)
-      groupMap[groupKey].balance += (master.balance || 0) + subTotal
+      groupMap[groupKey].balance += aggregatedBalance
     }
   }
 
@@ -206,6 +238,17 @@ const accountGroups = computed(() => {
     }
   }
 
+  // 虚拟账户（应收应付款项等）注入到对应分组，排在末尾
+  for (const vAcc of VIRTUAL_ACCOUNTS) {
+    const groupKey = vAcc.accountGroup || '其他'
+    if (!groupMap[groupKey]) {
+      groupMap[groupKey] = { name: groupKey, accounts: [], balance: 0, totalCount: 0 }
+    }
+    groupMap[groupKey].accounts.push(vAcc)
+    groupMap[groupKey].totalCount += 1
+    groupMap[groupKey].balance += vAcc.balance || 0
+  }
+
   // 组内排序：按 sortOrder
   for (const group of Object.values(groupMap)) {
     group.accounts.sort((a, b) => (a.sortOrder || 999) - (b.sortOrder || 999))
@@ -222,36 +265,37 @@ const accountGroups = computed(() => {
   })
 })
 
-// 总资产/总负债：基于主账户（含子账户）+ 独立账户
-const totalAssets = computed(() => {
-  let sum = 0
-  for (const { master, children } of accountHierarchy.value.masters.values()) {
-    if (master.includeInTotal !== false && !master.isArchived) {
-      const subSum = children.reduce((s, c) => s + (c.balance || 0), 0)
-      sum += (master.balance || 0) + subSum
+// 总资产/总负债：直接复用 accountGroups 展示数据，确保"头部 = 页面所见之和"，单一事实来源。
+// - 主账户行的 balance 已在 accountGroups 里聚合过（自身+子账户，只计一次）
+// - 子账户不作为独立行出现在 group.accounts（已并入主账户）
+// - 归档分组排除
+// - includeInTotal=false 的账户已在 accountGroups 里跳过分组汇总，这里也一致跳过
+const displayedTopLevelAccounts = computed(() => {
+  const rows = []
+  for (const group of accountGroups.value) {
+    if (group.name === '归档') continue
+    for (const acc of group.accounts) {
+      if (acc.includeInTotal === false) continue
+      rows.push(acc)
     }
   }
-  for (const acc of accountHierarchy.value.independents) {
-    if (acc.includeInTotal !== false && !acc.isArchived && (acc.balance || 0) > 0) {
-      sum += acc.balance || 0
-    }
+  return rows
+})
+
+const totalAssets = computed(() => {
+  let sum = 0
+  for (const acc of displayedTopLevelAccounts.value) {
+    const bal = acc.balance || 0
+    if (bal > 0) sum += bal
   }
   return sum
 })
 
 const totalDebts = computed(() => {
   let sum = 0
-  for (const { master, children } of accountHierarchy.value.masters.values()) {
-    if (master.includeInTotal !== false && !master.isArchived) {
-      const subSum = children.reduce((s, c) => s + (c.balance || 0), 0)
-      const total = (master.balance || 0) + subSum
-      if (total < 0) sum += total
-    }
-  }
-  for (const acc of accountHierarchy.value.independents) {
-    if (acc.includeInTotal !== false && !acc.isArchived && (acc.balance || 0) < 0) {
-      sum += acc.balance || 0
-    }
+  for (const acc of displayedTopLevelAccounts.value) {
+    const bal = acc.balance || 0
+    if (bal < 0) sum += bal
   }
   return sum
 })
@@ -261,12 +305,17 @@ const netWorth = computed(() => totalAssets.value + totalDebts.value)
 
 function toggleGroup(name) {
   expandedGroups[name] = !expandedGroups[name]
+  try {
+    localStorage.setItem(EXPANDED_GROUPS_KEY, JSON.stringify(expandedGroups))
+  } catch {}
 }
 
+// 与 Moze 一致：绝对值 >= 10 万用 K 单位（2 位小数，去尾零）；否则显示完整金额 ¥xxx,xxx.xx
 function formatK(val) {
   const n = Number(val) || 0
-  if (Math.abs(n) >= 10000) {
-    return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K'
+  const abs = Math.abs(n)
+  if (abs >= 100000) {
+    return (n / 1000).toFixed(2).replace(/\.?0+$/, '') + 'K'
   }
   return '¥' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
@@ -474,6 +523,17 @@ function formatFullBalance(val) {
 .account-name {
   font-size: 14px;
   color: #555555;
+}
+.account-name-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.account-subtitle {
+  font-size: 11px;
+  color: #999;
+  line-height: 1.2;
 }
 
 .account-balance {

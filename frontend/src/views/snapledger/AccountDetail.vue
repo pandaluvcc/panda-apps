@@ -194,10 +194,13 @@
                 <span class="picker-arrow">›</span>
               </div>
             </div>
-            <!-- 子账户：显示主账户 -->
-            <div v-if="isSubAccount" class="form-item">
+            <!-- 子账户：可点击切换主账户 -->
+            <div v-if="isSubAccount" class="form-item form-item--picker" @click="showMasterPicker = true">
               <span class="form-label">主账户</span>
-              <span class="form-value">{{ masterAccountName }}</span>
+              <div class="form-picker-value">
+                <span>{{ masterAccountName || '无' }}</span>
+                <span class="picker-arrow">›</span>
+              </div>
             </div>
             <!-- 主账户：子账户入口 -->
             <div v-if="account?.isMasterAccount" class="form-item form-item--picker" @click="goToSubAccounts">

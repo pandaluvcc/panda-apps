@@ -127,8 +127,8 @@ public class AccountService {
                 .orElseThrow(() -> new RuntimeException("账户不存在：" + id));
 
         // 【主/子账户关联验证与分组级联】
-        // 保存旧状态用于后续变更检测
-        boolean wasMaster = account.getIsMasterAccount();
+        // 保存旧状态用于后续变更检测（防御 null，避免历史脏数据拆箱 NPE）
+        boolean wasMaster = Boolean.TRUE.equals(account.getIsMasterAccount());
         String oldGroup = account.getAccountGroup();
 
         // 如果设置主账户，验证主账户存在且为 master 类型，并同步分组
@@ -156,7 +156,10 @@ public class AccountService {
         account.setBillCycleStart(dto.getBillCycleStart());
         account.setBillCycleEnd(dto.getBillCycleEnd());
         account.setIsCreditAccount(dto.getIsCreditAccount());
-        account.setIsMasterAccount(dto.getIsMasterAccount());
+        // 仅当 DTO 显式提供时才覆写主账户标记，避免前端不传字段导致 null 污染
+        if (dto.getIsMasterAccount() != null) {
+            account.setIsMasterAccount(dto.getIsMasterAccount());
+        }
         account.setCashback(dto.getCashback());
         account.setAutoRollover(dto.getAutoRollover());
         account.setForeignTransactionFee(dto.getForeignTransactionFee());
@@ -175,7 +178,8 @@ public class AccountService {
         Account saved = accountRepository.save(account);
 
         // 【主账户分组变更：级联更新所有子账户分组】
-        if (wasMaster && Boolean.TRUE.equals(dto.getIsMasterAccount())) {
+        // 仍为主账户（DTO 未显式降级）且分组变更时级联
+        if (wasMaster && !Boolean.FALSE.equals(dto.getIsMasterAccount())) {
             String newGroup = dto.getAccountGroup();
             if (!newGroup.equals(oldGroup)) {
                 List<Account> subAccounts = accountRepository.findByMasterAccountName(account.getName());
@@ -187,7 +191,8 @@ public class AccountService {
         }
 
         // 【主账户取消主账户标记：解绑所有子账户】
-        if (wasMaster && (dto.getIsMasterAccount() == null || !dto.getIsMasterAccount())) {
+        // 仅当 DTO 显式传入 false 才解绑，null 视为"未提供"不做变更
+        if (wasMaster && Boolean.FALSE.equals(dto.getIsMasterAccount())) {
             unlinkAllSubAccounts(account.getName());
         }
 
