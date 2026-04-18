@@ -122,6 +122,13 @@ public class RecurringEventService {
         return recordRepo.findByRecurringEventIdOrderByDateDesc(eventId);
     }
 
+    /** 外部调用：把当前 DB 中同名的孤儿记录回溯挂到已存在事件上。 */
+    @Transactional
+    public void backfillOrphansForEvent(Long eventId) {
+        RecurringEvent e = eventRepo.findById(eventId).orElseThrow();
+        backfillHistorical(e);
+    }
+
     private void backfillHistorical(RecurringEvent event) {
         List<Record> orphans = recordRepo.findByNameAndRecurringEventIdIsNull(event.getName());
         if (orphans.isEmpty()) return;

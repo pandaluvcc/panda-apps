@@ -180,7 +180,17 @@ public class MozeCsvImporter {
     void ensurePredefinedRecurringEvents() {
         for (PredefinedRecurring preset : PREDEFINED_RECURRING) {
             try {
-                if (recurringEventRepository.existsByName(preset.name)) continue;
+                // 事件已存在：把本次新导入的同名孤儿记录挂上去
+                java.util.Optional<com.panda.snapledger.domain.RecurringEvent> existing =
+                    recurringEventRepository.findAll().stream()
+                        .filter(e -> preset.name.equals(e.getName()))
+                        .findFirst();
+                if (existing.isPresent()) {
+                    recurringEventService.backfillOrphansForEvent(existing.get().getId());
+                    log.info("CSV导入：回溯挂接新孤儿到已有周期事件 name={}", preset.name);
+                    continue;
+                }
+
                 LocalDate earliest = recordRepository
                     .findByNameAndRecurringEventIdIsNull(preset.name)
                     .stream()
@@ -206,7 +216,7 @@ public class MozeCsvImporter {
                 recurringEventService.create(req);
                 log.info("CSV导入：创建周期事件 name={}, startDate={}", preset.name, earliest);
             } catch (Exception e) {
-                log.warn("创建周期事件失败 name={}: {}", preset.name, e.getMessage());
+                log.warn("创建/回溯周期事件失败 name={}: {}", preset.name, e.getMessage());
             }
         }
     }

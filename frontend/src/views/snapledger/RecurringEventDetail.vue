@@ -117,10 +117,13 @@ const subtitleText = computed(() => {
   return parts.join(' · ')
 })
 
-/** 总金额 = 当前所有期记录金额之和（已按 period 去重）。 */
+/** 总金额 = 已发生期（date <= today）记录金额之和。 */
 const totalAmount = computed(() => {
   if (!event.value?.records) return 0
-  return event.value.records.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+  const today = new Date().toISOString().slice(0, 10)
+  return event.value.records
+    .filter(r => r.date <= today)
+    .reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
 })
 
 const sortedRecords = computed(() => {
