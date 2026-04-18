@@ -117,13 +117,10 @@ const subtitleText = computed(() => {
   return parts.join(' · ')
 })
 
-/** 总金额 = 单期金额 × 总期数（有限事件）或单期金额（无限期）。 */
+/** 总金额 = 当前所有期记录金额之和（已按 period 去重）。 */
 const totalAmount = computed(() => {
-  if (!event.value) return 0
-  if (event.value.totalPeriods) {
-    return Number(event.value.amount) * event.value.totalPeriods
-  }
-  return Number(event.value.amount)
+  if (!event.value?.records) return 0
+  return event.value.records.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
 })
 
 const sortedRecords = computed(() => {
