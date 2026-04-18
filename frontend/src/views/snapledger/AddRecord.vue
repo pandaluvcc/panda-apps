@@ -81,13 +81,16 @@
       </div>
     </div>
 
-    <!-- 商家 / 周期 -->
+    <!-- 商家 / 高级设置 -->
     <div class="form-row">
       <div class="form-item">
         <input v-model="form.merchant" class="form-input" placeholder="商家" />
       </div>
       <div class="form-item">
-        <input v-model.number="form.count" type="number" class="form-input" placeholder="周期" />
+        <div class="form-input pick-input" @click="showAdvancedSheet = true">
+          <span class="input-text">{{ advancedLabel }}</span>
+          <van-icon name="arrow" class="pick-arrow" />
+        </div>
       </div>
     </div>
 
@@ -138,6 +141,13 @@
 
     <!-- 标签选择器 -->
     <TagPicker v-model:show="showTagPicker" v-model="form.tags" />
+
+    <!-- 高级设置：单次/周期/分期 -->
+    <AdvancedSettingsSheet
+      v-model:visible="showAdvancedSheet"
+      :initial-config="advancedConfig"
+      @confirm="onAdvancedConfirm"
+    />
   </div>
 </template>
 
@@ -145,10 +155,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { createRecord, updateRecord, deleteRecord, getRecordById, getCategories, getAccounts } from '@/api'
+import { createRecurringEvent } from '@/api/snapledger/recurringEvent'
 import { formatDateISO } from '@/utils/format'
 import SnapTabbar from '@/components/snapledger/SnapTabbar.vue'
 import TagPicker from '@/components/snapledger/TagPicker.vue'
 import DateTimePicker from '@/components/snapledger/DateTimePicker.vue'
+import AdvancedSettingsSheet from '@/components/snapledger/AdvancedSettingsSheet.vue'
 import { showConfirmDialog, showToast } from 'vant'
 
 const router = useRouter()
@@ -198,7 +210,21 @@ const accounts = ref([])
 const showAccountPicker = ref(false)
 const showDateTimePicker = ref(false)
 const showTagPicker = ref(false)
+const showAdvancedSheet = ref(false)
 const saving = ref(false)
+
+// 高级设置：默认"单次"
+const advancedConfig = ref({ mode: 'single' })
+
+const advancedLabel = computed(() => {
+  if (advancedConfig.value.mode === 'recurring') return '周期'
+  if (advancedConfig.value.mode === 'installment') return '分期'
+  return '单次'
+})
+
+function onAdvancedConfirm(payload) {
+  advancedConfig.value = payload
+}
 
 // 定时器
 let incrementTimer = null
@@ -347,9 +373,35 @@ async function save() {
 
     if (isEdit.value) {
       await updateRecord(route.params.id, data)
-    } else {
-      await createRecord(data)
+      router.push('/snap')
+      return
     }
+
+    if (advancedConfig.value.mode === 'recurring') {
+      // 创建周期事件：以表单内容为模板
+      const payload = {
+        name: form.value.name || form.value.mainCategory,
+        recordType: form.value.recordType,
+        amount: Number(form.value.amount),
+        mainCategory: form.value.mainCategory,
+        subCategory: form.value.subCategory,
+        account: form.value.account,
+        targetAccount: form.value.target || null,
+        intervalType: advancedConfig.value.intervalType,
+        intervalValue: advancedConfig.value.intervalValue || 1,
+        dayOfMonth: advancedConfig.value.dayOfMonth,
+        dayOfWeek: advancedConfig.value.dayOfWeek,
+        startDate: form.value.date,
+        totalPeriods: advancedConfig.value.totalPeriods,
+        note: form.value.description || null
+      }
+      await createRecurringEvent(payload)
+      showToast('周期事件已创建')
+      router.push('/snap/events/recurring')
+      return
+    }
+
+    await createRecord(data)
     router.push('/snap')
   } catch (e) {
     console.error('Failed to save:', e)
