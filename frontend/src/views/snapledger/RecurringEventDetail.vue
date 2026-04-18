@@ -1,62 +1,43 @@
 <template>
   <div class="detail-page">
-    <div class="page-header">
-      <van-icon name="arrow-left" class="back-btn" @click="$router.back()" />
-      <span class="page-title">事件详情</span>
-      <van-icon name="ellipsis" class="menu-btn" @click="showMoreMenu = true" />
+    <div class="header-bar">
+      <van-icon name="arrow-left" class="icon-btn" @click="$router.back()" />
+      <span class="page-title">周期事件</span>
+      <van-icon name="ellipsis" class="icon-btn" @click="showMoreMenu = true" />
     </div>
 
-    <div v-if="event" class="content">
-      <!-- 事件概要 -->
-      <div class="summary-card">
-        <div class="summary-title">{{ event.name }}</div>
-        <div class="summary-amount" :class="amountClass(event.recordType)">
-          ￥{{ fmtAmount(event.amount) }}
+    <div v-if="event" class="event-card">
+      <!-- 事件 header -->
+      <div class="card-header">
+        <div class="header-icon" :style="{ backgroundColor: iconColor }">
+          <van-icon :name="iconName" color="#fff" size="26" />
         </div>
-        <div class="summary-meta">
-          <div><span>账户：</span>{{ event.account }}{{ event.targetAccount ? ` → ${event.targetAccount}` : '' }}</div>
-          <div><span>周期：</span>{{ intervalLabel }}</div>
-          <div><span>起始：</span>{{ event.startDate }}</div>
-          <div><span>期限：</span>{{ event.totalPeriods ? `${event.totalPeriods} 期` : '无限期' }}</div>
-          <div v-if="event.status === 'ENDED'"><span>结束于：</span>{{ fmtDate(event.endedAt) }}</div>
-        </div>
-      </div>
-
-      <!-- 期数概览 -->
-      <div class="stats-row">
-        <div class="stat">
-          <div class="stat-label">总期数</div>
-          <div class="stat-value">{{ event.totalCount }}</div>
-        </div>
-        <div class="stat">
-          <div class="stat-label">已发生</div>
-          <div class="stat-value">{{ event.elapsedCount }}</div>
-        </div>
-        <div class="stat">
-          <div class="stat-label">剩余</div>
-          <div class="stat-value">{{ event.remainingCount }}</div>
+        <div class="header-main">
+          <div class="header-top">
+            <div class="name">{{ event.name }}</div>
+            <div class="amount" :class="amountClass(event.recordType)">
+              ￥{{ fmtAmount(totalAmount) }}
+            </div>
+          </div>
+          <div class="header-sub">{{ subtitleText }}</div>
         </div>
       </div>
+      <div class="divider"></div>
 
       <!-- 期数列表 -->
-      <div class="records">
-        <div class="records-title">期数明细</div>
-        <div
-          v-for="r in sortedRecords"
-          :key="r.id"
-          class="record-item"
-          :class="{ future: isFuture(r) }"
-          @click="openRecord(r)"
-        >
-          <div class="record-left">
-            <div class="period-chip" :class="{ future: isFuture(r) }">
-              {{ r.periodNumber || '-' }}
-            </div>
-            <div class="record-date">{{ r.date }}</div>
-          </div>
-          <div class="record-amount" :class="amountClass(r.recordType)">
-            ￥{{ fmtAmount(r.amount) }}
-          </div>
+      <div
+        v-for="r in sortedRecords"
+        :key="r.id"
+        class="period-row"
+        :class="{ future: isFuture(r) }"
+        @click="openRecord(r)"
+      >
+        <div class="period-chip" :class="{ future: isFuture(r) }">
+          {{ r.periodNumber || '-' }}
+        </div>
+        <div class="period-date">{{ fmtPeriodDate(r.date) }}</div>
+        <div class="period-amount" :class="amountClass(r.recordType)">
+          ￥{{ fmtAmount(r.amount) }}
         </div>
       </div>
     </div>
@@ -104,6 +85,8 @@ const showMoreMenu = ref(false)
 const showRecordAction = ref(false)
 const selectedRecord = ref(null)
 
+const TRANSFER_TYPES = ['转账', '还款', '转出', '转入', '应付款项', '应收款项', '分期还款']
+
 const eventActions = computed(() => {
   const actions = []
   if (event.value?.status === 'ACTIVE') {
@@ -113,31 +96,57 @@ const eventActions = computed(() => {
   return actions
 })
 
-const TRANSFER_TYPES = ['转账', '还款', '转出', '转入', '应付款项', '应收款项', '分期还款']
-
-/** 周期事件页面配色：转账类红色，其他（支出/收入）绿色，金额不加 +/- 符号。 */
 function amountClass(type) {
   return TRANSFER_TYPES.includes(type) ? 'amount-red' : 'amount-green'
 }
 function fmtAmount(v) {
   return (Math.abs(Number(v) || 0)).toFixed(2)
 }
+function fmtPeriodDate(v) {
+  if (!v) return ''
+  return String(v).replaceAll('-', '/')
+}
 function isFuture(r) {
   return r.date > new Date().toISOString().slice(0, 10)
 }
-function fmtDate(v) {
-  if (!v) return ''
-  return String(v).replace('T', ' ').slice(0, 16)
-}
+
+const iconName = computed(() => {
+  if (!event.value) return 'home-o'
+  if (TRANSFER_TYPES.includes(event.value.recordType)) return 'exchange'
+  if (event.value.recordType === '收入') return 'cash-o'
+  return 'home-o'
+})
+const iconColor = computed(() => {
+  if (!event.value) return '#999'
+  if (TRANSFER_TYPES.includes(event.value.recordType)) return '#D8944B'
+  if (event.value.recordType === '收入') return '#67c23a'
+  return '#C97789'
+})
 
 const intervalLabel = computed(() => {
   if (!event.value) return ''
   const map = { DAILY: '每日', WEEKLY: '每周', MONTHLY: '每月', YEARLY: '每年' }
-  const base = map[event.value.intervalType] || event.value.intervalType
+  return map[event.value.intervalType] || event.value.intervalType
+})
+
+const subtitleText = computed(() => {
+  if (!event.value) return ''
+  const parts = []
+  parts.push(event.value.totalPeriods ? `${event.value.totalPeriods}期` : '无限期')
+  parts.push(intervalLabel.value)
   if (event.value.intervalType === 'MONTHLY' && event.value.dayOfMonth) {
-    return `${base} ${event.value.dayOfMonth}号`
+    parts.push(`${event.value.dayOfMonth}号`)
   }
-  return base
+  return parts.join(' · ')
+})
+
+/** 总金额 = 单期金额 × 总期数（有限事件）或单期金额（无限期）。 */
+const totalAmount = computed(() => {
+  if (!event.value) return 0
+  if (event.value.totalPeriods) {
+    return Number(event.value.amount) * event.value.totalPeriods
+  }
+  return Number(event.value.amount)
 })
 
 const sortedRecords = computed(() => {
@@ -194,7 +203,6 @@ async function onRecordEdit(mode) {
     router.push(`/snap/edit/${r.id}`)
     return
   }
-  // entire / future：弹出输入框修改金额（MVP 支持金额修改）
   const label = mode === 'entire' ? '修改整个周期事件金额' : `从第 ${r.periodNumber} 期起修改金额`
   try {
     const value = await promptAmount(label, event.value.amount)
@@ -274,49 +282,69 @@ onMounted(load)
 </script>
 
 <style scoped>
-.detail-page { min-height: 100vh; background: #f5f6f8; padding-bottom: 32px; }
-.page-header {
-  background: #fff; padding: 12px 16px; border-bottom: 1px solid #ebedf0;
-  display: grid; grid-template-columns: 32px 1fr 32px; align-items: center;
+.detail-page {
+  min-height: 100vh;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 16px 12px 32px;
+  box-sizing: border-box;
 }
-.back-btn, .menu-btn { font-size: 20px; color: #333; cursor: pointer; }
-.page-title { font-size: 17px; font-weight: 600; color: #1a1a1a; text-align: center; }
-.loading { padding: 40px; text-align: center; color: #969799; }
-.content { padding: 12px; }
-
-.summary-card {
-  background: #fff; border-radius: 12px; padding: 20px 16px; margin-bottom: 12px;
+.header-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 4px 16px;
 }
-.summary-title { font-size: 18px; font-weight: 600; color: #1a1a1a; margin-bottom: 8px; }
-.summary-amount { font-size: 26px; font-weight: 600; margin-bottom: 14px; }
-.summary-meta { font-size: 13px; color: #666; line-height: 1.8; }
-.summary-meta span { color: #999; }
-
-.stats-row {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
-  background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 12px;
+.icon-btn {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: #fff; color: #333; font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
 }
-.stat { text-align: center; }
-.stat-label { font-size: 12px; color: #969799; margin-bottom: 4px; }
-.stat-value { font-size: 20px; font-weight: 600; color: #1a1a1a; }
+.page-title { font-size: 18px; font-weight: 600; color: #1a1a1a; }
 
-.records { background: #fff; border-radius: 12px; padding: 12px 16px; }
-.records-title { font-size: 14px; color: #666; margin-bottom: 8px; }
-.record-item {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 12px 0; border-bottom: 1px solid #f2f3f5;
+.loading { padding: 60px; text-align: center; color: #fff; }
+
+.event-card {
+  background: #fff; border-radius: 18px; overflow: hidden;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+}
+
+.card-header {
+  display: flex; align-items: center; gap: 14px; padding: 18px 18px 16px;
+}
+.header-icon {
+  width: 54px; height: 54px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.header-main { flex: 1; min-width: 0; }
+.header-top {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+}
+.name {
+  font-size: 20px; font-weight: 600; color: #1a1a1a;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.amount { font-size: 20px; font-weight: 600; flex-shrink: 0; }
+.header-sub { font-size: 13px; color: #aaa; margin-top: 4px; }
+
+.divider { height: 1px; background: #f2f3f5; margin: 0 18px; }
+
+.period-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 18px;
   cursor: pointer; user-select: none;
 }
-.record-item:last-child { border-bottom: none; }
-.record-item.future { opacity: 0.5; }
-.record-left { display: flex; align-items: center; gap: 12px; }
+.period-row.future { opacity: 0.4; }
+
 .period-chip {
-  min-width: 32px; padding: 3px 10px; border-radius: 12px;
-  background: #4aa9ff; color: #fff; font-size: 13px; font-weight: 500; text-align: center;
+  min-width: 36px; padding: 4px 10px; border-radius: 14px;
+  background: #4aa9ff; color: #fff; font-size: 14px; font-weight: 500;
+  text-align: center; flex-shrink: 0;
 }
 .period-chip.future { background: #bde0ff; }
-.record-date { font-size: 15px; color: #333; }
-.record-amount { font-size: 15px; font-weight: 500; }
+
+.period-date {
+  flex: 1; font-size: 18px; color: #222; letter-spacing: 0.5px;
+}
+.period-amount { font-size: 17px; font-weight: 500; flex-shrink: 0; }
 
 .amount-red { color: #f56c6c; }
 .amount-green { color: #67c23a; }

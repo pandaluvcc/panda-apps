@@ -59,9 +59,16 @@ const activeStatus = ref('ACTIVE')
 const activeList = ref([])
 const endedList = ref([])
 
-const currentList = computed(() =>
-  activeStatus.value === 'ACTIVE' ? activeList.value : endedList.value
-)
+const currentList = computed(() => {
+  const raw = activeStatus.value === 'ACTIVE' ? activeList.value : endedList.value
+  // 按下次执行日期升序；空值（已结束）排最后
+  return [...raw].sort((a, b) => {
+    if (!a.nextDueDate && !b.nextDueDate) return 0
+    if (!a.nextDueDate) return 1
+    if (!b.nextDueDate) return -1
+    return a.nextDueDate < b.nextDueDate ? -1 : a.nextDueDate > b.nextDueDate ? 1 : 0
+  })
+})
 
 const TRANSFER_TYPES = ['转账', '还款', '转出', '转入', '应付款项', '应收款项', '分期还款']
 
