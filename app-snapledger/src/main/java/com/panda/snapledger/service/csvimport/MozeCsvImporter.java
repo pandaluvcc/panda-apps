@@ -180,41 +180,35 @@ public class MozeCsvImporter {
     void ensurePredefinedRecurringEvents() {
         for (PredefinedRecurring preset : PREDEFINED_RECURRING) {
             try {
-                // 事件已存在：把本次新导入的同名孤儿记录挂上去
                 java.util.Optional<com.panda.snapledger.domain.RecurringEvent> existing =
                     recurringEventRepository.findAll().stream()
                         .filter(e -> preset.name.equals(e.getName()))
                         .findFirst();
+                Long eventId;
                 if (existing.isPresent()) {
-                    recurringEventService.backfillOrphansForEvent(existing.get().getId());
+                    eventId = existing.get().getId();
+                    recurringEventService.backfillOrphansForEvent(eventId);
                     log.info("CSV导入：回溯挂接新孤儿到已有周期事件 name={}", preset.name);
-                    continue;
+                } else {
+                    RecurringEventRequest req = new RecurringEventRequest();
+                    req.setName(preset.name);
+                    req.setRecordType(preset.recordType);
+                    req.setAmount(preset.amount);
+                    req.setMainCategory(preset.mainCategory);
+                    req.setAccount(preset.account);
+                    req.setTargetAccount(preset.targetAccount);
+                    req.setIntervalType("MONTHLY");
+                    req.setIntervalValue(1);
+                    req.setDayOfMonth(preset.dayOfMonth);
+                    req.setStartDate(preset.startDate);
+                    eventId = recurringEventService.create(req).getId();
+                    log.info("CSV导入：创建周期事件 name={}, startDate={}", preset.name, preset.startDate);
                 }
-
-                LocalDate earliest = recordRepository
-                    .findByNameAndRecurringEventIdIsNull(preset.name)
-                    .stream()
-                    .map(Record::getDate)
-                    .filter(java.util.Objects::nonNull)
-                    .min(Comparator.naturalOrder())
-                    .orElse(null);
-                if (earliest == null) {
-                    log.info("跳过周期事件创建：未找到同名记录 name={}", preset.name);
-                    continue;
+                // 处理别名：把不同名称的历史记录也挂到这个事件上
+                if (!preset.aliases.isEmpty()) {
+                    recurringEventService.backfillOrphansByAliases(eventId, preset.aliases);
+                    log.info("CSV导入：按别名回溯 name={} aliases={}", preset.name, preset.aliases);
                 }
-                RecurringEventRequest req = new RecurringEventRequest();
-                req.setName(preset.name);
-                req.setRecordType(preset.recordType);
-                req.setAmount(preset.amount);
-                req.setMainCategory(preset.mainCategory);
-                req.setAccount(preset.account);
-                req.setTargetAccount(preset.targetAccount);
-                req.setIntervalType("MONTHLY");
-                req.setIntervalValue(1);
-                req.setDayOfMonth(preset.dayOfMonth);
-                req.setStartDate(earliest);
-                recurringEventService.create(req);
-                log.info("CSV导入：创建周期事件 name={}, startDate={}", preset.name, earliest);
             } catch (Exception e) {
                 log.warn("创建/回溯周期事件失败 name={}: {}", preset.name, e.getMessage());
             }
@@ -223,11 +217,14 @@ public class MozeCsvImporter {
 
     private static final List<PredefinedRecurring> PREDEFINED_RECURRING = List.of(
         new PredefinedRecurring("预缴当月房贷", "转账",
-            new BigDecimal("4300.00"), null, "招行朝朝宝°", "中信银行", 19),
+            new BigDecimal("4300.00"), null, "招行朝朝宝°", "中信银行", 19,
+            LocalDate.of(2024, 12, 19), List.of()),
         new PredefinedRecurring("商贷", "支出",
-            new BigDecimal("2985.34"), "房产", "中信银行", null, 20),
+            new BigDecimal("2985.34"), "房产", "中信银行", null, 20,
+            LocalDate.of(2025, 4, 20), List.of("应交当月房贷")),
         new PredefinedRecurring("公积金贷款", "支出",
-            new BigDecimal("1200.51"), "房产", "中信银行", null, 20)
+            new BigDecimal("1200.51"), "房产", "中信银行", null, 20,
+            LocalDate.of(2025, 5, 20), List.of())
     );
 
     private record PredefinedRecurring(
@@ -237,7 +234,9 @@ public class MozeCsvImporter {
             String mainCategory,
             String account,
             String targetAccount,
-            int dayOfMonth
+            int dayOfMonth,
+            LocalDate startDate,
+            List<String> aliases
     ) {}
 
     @Transactional

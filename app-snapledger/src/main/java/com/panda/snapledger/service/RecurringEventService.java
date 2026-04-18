@@ -129,6 +129,25 @@ public class RecurringEventService {
         backfillHistorical(e);
     }
 
+    /** 按给定的备用名称列表把孤儿记录挂到事件上（用于别名）。 */
+    @Transactional
+    public void backfillOrphansByAliases(Long eventId, List<String> aliases) {
+        RecurringEvent e = eventRepo.findById(eventId).orElseThrow();
+        for (String alias : aliases) {
+            List<Record> orphans = recordRepo.findByNameAndRecurringEventIdIsNull(alias).stream()
+                .filter(r -> r.getDate() != null && !r.getDate().isBefore(e.getStartDate()))
+                .collect(java.util.stream.Collectors.toList());
+            if (orphans.isEmpty()) continue;
+            for (Record r : orphans) {
+                r.setRecurringEventId(e.getId());
+                int period = generator.periodsBetween(e, e.getStartDate(), r.getDate());
+                r.setPeriodNumber(period);
+            }
+            recordRepo.saveAll(orphans);
+            deleteDuplicateGeneratedPeriods(e, orphans);
+        }
+    }
+
     private void backfillHistorical(RecurringEvent event) {
         List<Record> allOrphans = recordRepo.findByNameAndRecurringEventIdIsNull(event.getName());
         // 跳过 startDate 之前的历史记录：它们不属于本期事件
