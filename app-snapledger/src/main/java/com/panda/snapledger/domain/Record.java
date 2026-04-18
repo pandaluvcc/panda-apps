@@ -82,6 +82,12 @@ public class Record {
     public static final String RECONCILIATION_CONFIRMED = "CONFIRMED";
     public static final String RECONCILIATION_POSTPONED = "POSTPONED";
 
+    @Column(name = "recurring_event_id")
+    private Long recurringEventId;
+
+    @Column(name = "period_number")
+    private Integer periodNumber;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
