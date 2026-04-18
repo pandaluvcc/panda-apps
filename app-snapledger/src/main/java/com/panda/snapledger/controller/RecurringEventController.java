@@ -41,7 +41,7 @@ public class RecurringEventController {
     @Operation(summary = "周期事件详情")
     public RecurringEventDetailResponse detail(@PathVariable Long id) {
         RecurringEvent e = service.findById(id);
-        List<Record> records = service.findRecords(id);
+        List<Record> records = dedupRecordsByPeriod(e, service.findRecords(id));
         RecurringEventDetailResponse r = new RecurringEventDetailResponse();
         copyBaseFields(e, r);
         r.setRecords(records);
@@ -51,6 +51,36 @@ public class RecurringEventController {
         r.setElapsedCount(elapsed);
         r.setRemainingCount(records.size() - elapsed);
         return r;
+    }
+
+    /**
+     * 每期只展示一条记录。Moze 的转账 CSV 对每笔成对导出 (转出/转入)，二者同名同期，
+     * 都被 backfill 挂到事件上；详情展示时按 periodNumber 去重，优先保留 account 与
+     * 事件主账户匹配的那条，其次保留 recordType 不是"转入"的那条。
+     */
+    private List<Record> dedupRecordsByPeriod(RecurringEvent e, List<Record> records) {
+        java.util.Map<Integer, Record> byPeriod = new java.util.LinkedHashMap<>();
+        List<Record> noPeriod = new java.util.ArrayList<>();
+        for (Record r : records) {
+            if (r.getPeriodNumber() == null) { noPeriod.add(r); continue; }
+            Record existing = byPeriod.get(r.getPeriodNumber());
+            if (existing == null || preferOver(r, existing, e)) {
+                byPeriod.put(r.getPeriodNumber(), r);
+            }
+        }
+        List<Record> result = new java.util.ArrayList<>(byPeriod.values());
+        result.addAll(noPeriod);
+        return result;
+    }
+
+    private boolean preferOver(Record candidate, Record current, RecurringEvent e) {
+        boolean candMatch = candidate.getAccount() != null && candidate.getAccount().equals(e.getAccount());
+        boolean currMatch = current.getAccount() != null && current.getAccount().equals(e.getAccount());
+        if (candMatch != currMatch) return candMatch;
+        boolean candTransferIn = "转入".equals(candidate.getRecordType());
+        boolean currTransferIn = "转入".equals(current.getRecordType());
+        if (candTransferIn != currTransferIn) return !candTransferIn;
+        return false;
     }
 
     @PutMapping("/{id}")

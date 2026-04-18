@@ -28,6 +28,7 @@
       <div
         v-for="r in sortedRecords"
         :key="r.id"
+        :ref="el => registerRow(r, el)"
         class="period-row"
         :class="{ future: isFuture(r) }"
         @click="openRecord(r)"
@@ -64,7 +65,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import {
@@ -166,6 +167,30 @@ const eventInfoText = computed(() => {
 function openRecord(r) {
   selectedRecord.value = r
   showRecordAction.value = true
+}
+
+// 保存每行 DOM 引用，打开后滚动到最新已发生期
+const rowRefs = new Map()
+function registerRow(r, el) {
+  if (el) rowRefs.set(r.id, el)
+  else rowRefs.delete(r.id)
+}
+
+function scrollToLatestElapsed() {
+  const records = sortedRecords.value
+  if (records.length === 0) return
+  // 最新已发生：date <= today 的最后一条
+  const today = new Date().toISOString().slice(0, 10)
+  let target = null
+  for (const r of records) {
+    if (r.date <= today) target = r
+    else break
+  }
+  if (!target) target = records[0]
+  const el = rowRefs.get(target.id)
+  if (el && typeof el.scrollIntoView === 'function') {
+    el.scrollIntoView({ block: 'center', behavior: 'instant' })
+  }
 }
 
 async function onEventAction(action) {
@@ -272,6 +297,8 @@ async function onRecordDelete() {
 async function load() {
   try {
     event.value = await getRecurringEvent(route.params.id)
+    await nextTick()
+    scrollToLatestElapsed()
   } catch (e) {
     console.error('Failed to load event:', e)
     showToast('加载失败')
