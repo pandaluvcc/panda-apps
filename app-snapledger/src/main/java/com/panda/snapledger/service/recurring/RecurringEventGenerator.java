@@ -50,15 +50,34 @@ public class RecurringEventGenerator {
         return PeriodDateCalculator.dateOfPeriod(event, Math.max(targetPeriod, DEFAULT_WINDOW_PERIODS));
     }
 
-    /** 返回从 event.startDate 到给定日期 to 已跨越的期数（当前处于第几期）。 */
+    /**
+     * 返回给定日期 to 对应的期数（1-based）。
+     *
+     * 对 MONTHLY / YEARLY 事件按自然日历计算：同一历月/年内的记录归属同一期，
+     * 避免"2/18 被算进 1/19 期"的错配。对 WEEKLY / DAILY 按顺序线性推进。
+     */
     public int periodsBetween(RecurringEvent event, LocalDate from, LocalDate to) {
-        int p = 1;
-        while (p < SAFETY_LIMIT) {
-            LocalDate next = PeriodDateCalculator.dateOfPeriod(event, p + 1);
-            if (next.isAfter(to)) break;
-            p++;
+        int interval = event.getIntervalValue() != null ? event.getIntervalValue() : 1;
+        switch (event.getIntervalType()) {
+            case RecurringEvent.INTERVAL_MONTHLY: {
+                int months = (to.getYear() - from.getYear()) * 12
+                    + (to.getMonthValue() - from.getMonthValue());
+                return Math.max(1, months / interval + 1);
+            }
+            case RecurringEvent.INTERVAL_YEARLY: {
+                int years = to.getYear() - from.getYear();
+                return Math.max(1, years / interval + 1);
+            }
+            default: {
+                int p = 1;
+                while (p < SAFETY_LIMIT) {
+                    LocalDate next = PeriodDateCalculator.dateOfPeriod(event, p + 1);
+                    if (next.isAfter(to)) break;
+                    p++;
+                }
+                return p;
+            }
         }
-        return p;
     }
 
     private Record buildRecord(RecurringEvent event, int period) {

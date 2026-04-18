@@ -130,7 +130,11 @@ public class RecurringEventService {
     }
 
     private void backfillHistorical(RecurringEvent event) {
-        List<Record> orphans = recordRepo.findByNameAndRecurringEventIdIsNull(event.getName());
+        List<Record> allOrphans = recordRepo.findByNameAndRecurringEventIdIsNull(event.getName());
+        // 跳过 startDate 之前的历史记录：它们不属于本期事件
+        List<Record> orphans = allOrphans.stream()
+            .filter(r -> r.getDate() != null && !r.getDate().isBefore(event.getStartDate()))
+            .collect(Collectors.toList());
         if (orphans.isEmpty()) return;
 
         for (Record r : orphans) {
