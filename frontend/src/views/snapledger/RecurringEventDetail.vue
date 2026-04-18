@@ -1,13 +1,7 @@
 <template>
-  <div class="detail-page">
-    <div class="header-bar">
-      <van-icon name="arrow-left" class="icon-btn" @click="$router.back()" />
-      <span class="page-title">周期事件</span>
-      <van-icon name="ellipsis" class="icon-btn" @click="showMoreMenu = true" />
-    </div>
-
-    <div v-if="event" class="event-card">
-      <!-- 事件 header -->
+  <div class="overlay" @click.self="$router.back()">
+    <div v-if="event" class="event-card" @click.stop>
+      <!-- 事件 header（固定） -->
       <div class="card-header">
         <div class="header-icon" :style="{ backgroundColor: iconColor }">
           <van-icon :name="iconName" color="#fff" size="26" />
@@ -24,34 +18,27 @@
       </div>
       <div class="divider"></div>
 
-      <!-- 期数列表 -->
-      <div
-        v-for="r in sortedRecords"
-        :key="r.id"
-        :ref="el => registerRow(r, el)"
-        class="period-row"
-        :class="{ future: isFuture(r) }"
-        @click="openRecord(r)"
-      >
-        <div class="period-chip" :class="{ future: isFuture(r) }">
-          {{ r.periodNumber || '-' }}
-        </div>
-        <div class="period-date">{{ fmtPeriodDate(r.date) }}</div>
-        <div class="period-amount" :class="amountClass(r.recordType)">
-          ￥{{ fmtAmount(r.amount) }}
+      <!-- 期数列表（内部滚动） -->
+      <div class="periods-scroll" ref="scrollBox">
+        <div
+          v-for="r in sortedRecords"
+          :key="r.id"
+          :ref="el => registerRow(r, el)"
+          class="period-row"
+          :class="{ future: isFuture(r) }"
+          @click="openRecord(r)"
+        >
+          <div class="period-chip" :class="{ future: isFuture(r) }">
+            {{ r.periodNumber || '-' }}
+          </div>
+          <div class="period-date">{{ fmtPeriodDate(r.date) }}</div>
+          <div class="period-amount" :class="amountClass(r.recordType)">
+            ￥{{ fmtAmount(r.amount) }}
+          </div>
         </div>
       </div>
     </div>
     <div v-else class="loading">加载中...</div>
-
-    <!-- 事件操作菜单 -->
-    <van-action-sheet
-      v-model:show="showMoreMenu"
-      :actions="eventActions"
-      cancel-text="取消"
-      close-on-click-action
-      @select="onEventAction"
-    />
 
     <!-- 点击 record 弹卡片 -->
     <RecordActionSheet
@@ -70,8 +57,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
 import {
   getRecurringEvent,
-  endRecurringEvent,
-  deleteRecurringEvent,
   updateEntireRecurringEvent,
   updateFromPeriod
 } from '@/api/snapledger/recurringEvent'
@@ -82,20 +67,11 @@ const route = useRoute()
 const router = useRouter()
 
 const event = ref(null)
-const showMoreMenu = ref(false)
 const showRecordAction = ref(false)
 const selectedRecord = ref(null)
+const scrollBox = ref(null)
 
 const TRANSFER_TYPES = ['转账', '还款', '转出', '转入', '应付款项', '应收款项', '分期还款']
-
-const eventActions = computed(() => {
-  const actions = []
-  if (event.value?.status === 'ACTIVE') {
-    actions.push({ name: '结束事件', color: '#333' })
-  }
-  actions.push({ name: '删除事件', color: '#f56c6c' })
-  return actions
-})
 
 function amountClass(type) {
   return TRANSFER_TYPES.includes(type) ? 'amount-red' : 'amount-green'
@@ -179,7 +155,6 @@ function registerRow(r, el) {
 function scrollToLatestElapsed() {
   const records = sortedRecords.value
   if (records.length === 0) return
-  // 最新已发生：date <= today 的最后一条
   const today = new Date().toISOString().slice(0, 10)
   let target = null
   for (const r of records) {
@@ -188,37 +163,11 @@ function scrollToLatestElapsed() {
   }
   if (!target) target = records[0]
   const el = rowRefs.get(target.id)
-  if (el && typeof el.scrollIntoView === 'function') {
-    el.scrollIntoView({ block: 'center', behavior: 'instant' })
-  }
-}
-
-async function onEventAction(action) {
-  if (action.name === '结束事件') {
-    try {
-      await showConfirmDialog({
-        title: '结束事件',
-        message: '结束后将删除所有未来期记录，历史记录保留。'
-      })
-      await endRecurringEvent(event.value.id)
-      showToast('已结束')
-      router.back()
-    } catch (e) {
-      if (e !== 'cancel') showToast('操作失败')
-    }
-  } else if (action.name === '删除事件') {
-    try {
-      await showConfirmDialog({
-        title: '删除事件',
-        message: '将删除事件本身和所有未来期记录，历史记录解绑保留。'
-      })
-      await deleteRecurringEvent(event.value.id)
-      showToast('已删除')
-      router.back()
-    } catch (e) {
-      if (e !== 'cancel') showToast('操作失败')
-    }
-  }
+  const box = scrollBox.value
+  if (!el || !box) return
+  // 滚动内部容器让目标行居中
+  const top = el.offsetTop - (box.clientHeight / 2) + (el.clientHeight / 2)
+  box.scrollTop = Math.max(0, top)
 }
 
 async function onRecordEdit(mode) {
@@ -309,33 +258,34 @@ onMounted(load)
 </script>
 
 <style scoped>
-.detail-page {
-  min-height: 100vh;
+.overlay {
+  position: fixed; inset: 0;
   background: rgba(0, 0, 0, 0.45);
-  padding: 16px 12px 32px;
-  box-sizing: border-box;
-}
-.header-bar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 4px 16px;
-}
-.icon-btn {
-  width: 36px; height: 36px; border-radius: 50%;
-  background: #fff; color: #333; font-size: 18px;
   display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
+  padding: 24px 12px;
+  box-sizing: border-box;
+  z-index: 100;
 }
-.page-title { font-size: 18px; font-weight: 600; color: #1a1a1a; }
 
-.loading { padding: 60px; text-align: center; color: #fff; }
+.loading { color: #fff; font-size: 14px; }
 
 .event-card {
-  background: #fff; border-radius: 18px; overflow: hidden;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+  background: #fff; border-radius: 18px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.15);
+  width: 100%; max-width: 440px;
+  max-height: 82vh;
+  display: flex; flex-direction: column;
+  overflow: hidden;
 }
 
 .card-header {
   display: flex; align-items: center; gap: 14px; padding: 18px 18px 16px;
+  flex-shrink: 0;
+}
+.divider { flex-shrink: 0; }
+.periods-scroll {
+  flex: 1; overflow-y: auto; overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .header-icon {
   width: 54px; height: 54px; border-radius: 50%; flex-shrink: 0;
