@@ -11,7 +11,7 @@
       <div class="summary-card">
         <div class="summary-title">{{ event.name }}</div>
         <div class="summary-amount" :class="amountClass(event.recordType)">
-          {{ amountSign(event.recordType) }}￥{{ fmtAmount(event.amount) }}
+          ￥{{ fmtAmount(event.amount) }}
         </div>
         <div class="summary-meta">
           <div><span>账户：</span>{{ event.account }}{{ event.targetAccount ? ` → ${event.targetAccount}` : '' }}</div>
@@ -45,19 +45,17 @@
           v-for="r in sortedRecords"
           :key="r.id"
           class="record-item"
-          @touchstart="onTouchStart(r, $event)"
-          @touchend="onTouchEnd"
-          @contextmenu.prevent="onLongPress(r)"
+          :class="{ future: isFuture(r) }"
+          @click="openRecord(r)"
         >
           <div class="record-left">
-            <div class="record-period">#{{ r.periodNumber || '-' }}</div>
+            <div class="period-chip" :class="{ future: isFuture(r) }">
+              {{ r.periodNumber || '-' }}
+            </div>
             <div class="record-date">{{ r.date }}</div>
           </div>
-          <div class="record-right">
-            <div class="record-amount" :class="amountClass(r.recordType)">
-              {{ amountSign(r.recordType) }}￥{{ fmtAmount(r.amount) }}
-            </div>
-            <div class="record-status">{{ recordStatusLabel(r) }}</div>
+          <div class="record-amount" :class="amountClass(r.recordType)">
+            ￥{{ fmtAmount(r.amount) }}
           </div>
         </div>
       </div>
@@ -73,9 +71,11 @@
       @select="onEventAction"
     />
 
-    <!-- 长按 record 菜单 -->
+    <!-- 点击 record 弹卡片 -->
     <RecordActionSheet
       v-model:visible="showRecordAction"
+      :record="selectedRecord"
+      :event-info="eventInfoText"
       @edit="onRecordEdit"
       @delete="onRecordDelete"
     />
@@ -113,18 +113,17 @@ const eventActions = computed(() => {
   return actions
 })
 
-const EXPENSE_TYPES = ['支出', '手续费', '利息']
+const TRANSFER_TYPES = ['转账', '还款', '转出', '转入', '应付款项', '应收款项', '分期还款']
 
+/** 周期事件页面配色：转账类红色，其他（支出/收入）绿色，金额不加 +/- 符号。 */
 function amountClass(type) {
-  return EXPENSE_TYPES.includes(type) ? 'amount-expense' : 'amount-income'
-}
-function amountSign(type) {
-  if (EXPENSE_TYPES.includes(type)) return '-'
-  if (type === '收入') return '+'
-  return ''
+  return TRANSFER_TYPES.includes(type) ? 'amount-red' : 'amount-green'
 }
 function fmtAmount(v) {
   return (Math.abs(Number(v) || 0)).toFixed(2)
+}
+function isFuture(r) {
+  return r.date > new Date().toISOString().slice(0, 10)
 }
 function fmtDate(v) {
   if (!v) return ''
@@ -144,33 +143,18 @@ const intervalLabel = computed(() => {
 const sortedRecords = computed(() => {
   if (!event.value?.records) return []
   return [...event.value.records].sort((a, b) => {
-    if (a.date < b.date) return 1
-    if (a.date > b.date) return -1
-    return (b.periodNumber || 0) - (a.periodNumber || 0)
+    if (a.date < b.date) return -1
+    if (a.date > b.date) return 1
+    return (a.periodNumber || 0) - (b.periodNumber || 0)
   })
 })
 
-function recordStatusLabel(r) {
-  const today = new Date().toISOString().slice(0, 10)
-  if (r.date > today) return '未到期'
-  return ''
-}
+const eventInfoText = computed(() => {
+  if (!event.value) return ''
+  return `${event.value.totalPeriods ? event.value.totalPeriods + '期' : '无限期'}（${intervalLabel.value}）`
+})
 
-// 长按检测：移动端 touchstart 600ms，PC 用 contextmenu
-let pressTimer = null
-function onTouchStart(r, evt) {
-  selectedRecord.value = r
-  pressTimer = setTimeout(() => {
-    showRecordAction.value = true
-  }, 600)
-}
-function onTouchEnd() {
-  if (pressTimer) {
-    clearTimeout(pressTimer)
-    pressTimer = null
-  }
-}
-function onLongPress(r) {
+function openRecord(r) {
   selectedRecord.value = r
   showRecordAction.value = true
 }
@@ -321,15 +305,19 @@ onMounted(load)
 .record-item {
   display: flex; justify-content: space-between; align-items: center;
   padding: 12px 0; border-bottom: 1px solid #f2f3f5;
-  user-select: none;
+  cursor: pointer; user-select: none;
 }
 .record-item:last-child { border-bottom: none; }
-.record-period { font-size: 14px; color: #1a1a1a; font-weight: 500; }
-.record-date { font-size: 12px; color: #999; margin-top: 2px; }
-.record-right { text-align: right; }
+.record-item.future { opacity: 0.5; }
+.record-left { display: flex; align-items: center; gap: 12px; }
+.period-chip {
+  min-width: 32px; padding: 3px 10px; border-radius: 12px;
+  background: #4aa9ff; color: #fff; font-size: 13px; font-weight: 500; text-align: center;
+}
+.period-chip.future { background: #bde0ff; }
+.record-date { font-size: 15px; color: #333; }
 .record-amount { font-size: 15px; font-weight: 500; }
-.record-status { font-size: 11px; color: #bbb; margin-top: 2px; }
 
-.amount-expense { color: #f56c6c; }
-.amount-income { color: #67c23a; }
+.amount-red { color: #f56c6c; }
+.amount-green { color: #67c23a; }
 </style>

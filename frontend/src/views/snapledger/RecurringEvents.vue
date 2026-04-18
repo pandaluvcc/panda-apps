@@ -39,7 +39,7 @@
         </div>
         <div class="card-right">
           <div class="card-amount" :class="amountClass(e)">
-            {{ amountSign(e) }}￥{{ fmtAmount(e.amount) }}
+            ￥{{ fmtAmount(e.amount) }}
           </div>
           <div class="card-next">{{ nextDueLabel(e) }}</div>
         </div>
@@ -63,7 +63,6 @@ const currentList = computed(() =>
   activeStatus.value === 'ACTIVE' ? activeList.value : endedList.value
 )
 
-const EXPENSE_TYPES = ['支出', '手续费', '利息']
 const TRANSFER_TYPES = ['转账', '还款', '转出', '转入', '应付款项', '应收款项', '分期还款']
 
 function iconName(e) {
@@ -76,13 +75,9 @@ function iconColor(e) {
   if (e.recordType === '收入') return '#67c23a'
   return '#C97789'
 }
+/** 周期事件配色：转账类红色，支出/收入类绿色，金额不加 +/- 符号。 */
 function amountClass(e) {
-  return EXPENSE_TYPES.includes(e.recordType) ? 'amount-expense' : 'amount-income'
-}
-function amountSign(e) {
-  if (EXPENSE_TYPES.includes(e.recordType)) return '-'
-  if (e.recordType === '收入') return '+'
-  return ''
+  return TRANSFER_TYPES.includes(e.recordType) ? 'amount-red' : 'amount-green'
 }
 function fmtAmount(v) {
   const n = Number(v) || 0
@@ -168,6 +163,6 @@ onActivated(loadLists)
 .card-right { text-align: right; flex-shrink: 0; }
 .card-amount { font-size: 16px; font-weight: 500; margin-bottom: 4px; }
 .card-next { font-size: 11px; color: #bbb; }
-.amount-income { color: #67c23a; }
-.amount-expense { color: #f56c6c; }
+.amount-green { color: #67c23a; }
+.amount-red { color: #f56c6c; }
 </style>
