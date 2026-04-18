@@ -27,7 +27,7 @@
     <!-- 导航项 -->
     <div class="tabbar-items">
       <div class="tabbar-item" :class="{ active: activeIndex === 0 }" @click="navigateTo('/snap', 0)">
-        <van-icon name="home-o" />
+        <van-icon name="gold-coin-o" />
         <span>总览</span>
       </div>
       <div class="tabbar-item" :class="{ active: activeIndex === 1 }" @click="navigateTo('/snap/stats', 1)">
@@ -40,9 +40,9 @@
         <van-icon name="balance-list-o" />
         <span>预算</span>
       </div>
-      <div class="tabbar-item" :class="{ active: activeIndex === 4 }" @click="navigateTo('/snap/import', 4)">
-        <van-icon name="down" />
-        <span>导入</span>
+      <div class="tabbar-item" :class="{ active: activeIndex === 4 }" @click="navigateTo('/snap/more', 4)">
+        <van-icon name="apps-o" />
+        <span>更多</span>
       </div>
     </div>
   </div>

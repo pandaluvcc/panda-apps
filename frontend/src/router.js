@@ -25,6 +25,9 @@ import SnapStats from '@/views/snapledger/Stats.vue'
 import SnapBudget from '@/views/snapledger/Budget.vue'
 import SnapAccountDetail from '@/views/snapledger/AccountDetail.vue'
 import SnapSubAccountList from '@/views/snapledger/SubAccountList.vue'
+import SnapMore from '@/views/snapledger/More.vue'
+import SnapRecurringEvents from '@/views/snapledger/RecurringEvents.vue'
+import SnapInstallmentEvents from '@/views/snapledger/InstallmentEvents.vue'
 
 const routes = [
   // 根路由 - 应用首页
@@ -139,6 +142,24 @@ const routes = [
     name: 'SnapBudget',
     component: SnapBudget,
     meta: { module: 'snapledger', transition: 'page-fade' }
+  },
+  {
+    path: '/snap/more',
+    name: 'SnapMore',
+    component: SnapMore,
+    meta: { module: 'snapledger', transition: 'page-fade' }
+  },
+  {
+    path: '/snap/events/recurring',
+    name: 'SnapRecurringEvents',
+    component: SnapRecurringEvents,
+    meta: { module: 'snapledger', transition: 'page-slide' }
+  },
+  {
+    path: '/snap/events/installment',
+    name: 'SnapInstallmentEvents',
+    component: SnapInstallmentEvents,
+    meta: { module: 'snapledger', transition: 'page-slide' }
   },
 
   // ========== 工具路由 ==========

@@ -1,10 +1,9 @@
 {
   "permissions": {
-    "defaultMode": "dontAsk",
     "allow": [
       "Write",
-	  "Edit",
-	  "Bash",
+      "Edit",
+      "Bash",
       "Bash(npm install:*)",
       "Bash(npx vitest:*)",
       "Bash(git init:*)",
@@ -33,7 +32,10 @@
       "Bash(python src/ui-ux-pro-max/scripts/search.py \"minimal clean white\" --domain color -n 5)",
       "Bash(git add:*)",
       "Bash(claude tasks:*)",
-      "Skill(update-config)"
-    ]
+      "Skill(update-config)",
+      "Bash(mkdir -p ~/.claude/cc-otel)",
+      "Bash(curl -L -o /tmp/cc-otel.zip \"https://github.com/young1lin/cc-otel/releases/download/v0.1.0-preview.2/cc-otel_0.1.0-preview.2_windows_amd64.zip\")"
+    ],
+    "defaultMode": "dontAsk"
   }
 }

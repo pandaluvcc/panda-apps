@@ -96,7 +96,7 @@ import SnapTabbar from '@/components/snapledger/SnapTabbar.vue'
 const route = useRoute()
 const showMonthPicker = ref(false)
 const saving = ref(false)
-const activeTab = ref(2) // 预算页为第三个 tab
+const activeTab = ref(3) // 预算页对应 tabbar 第 4 位（索引 3）
 
 const currentYear = ref(new Date().getFullYear())
 const currentMonth = ref(new Date().getMonth() + 1)

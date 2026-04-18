@@ -108,7 +108,9 @@
               </div>
               <div class="record-right">
                 <div class="record-date">{{ fmtDate(tx.date, tx.time) }}</div>
-                <div class="record-amount">￥{{ fmt(tx.amount) }}</div>
+                <div class="record-amount amount-income">
+                  {{ (Number(tx.amount) || 0) >= 0 ? '+' : '-' }}￥{{ fmtAbs(tx.amount) }}
+                </div>
                 <span class="tag tag-transfer">{{ tx.target === account?.name ? '还款' : '转出' }}</span>
               </div>
             </div>
@@ -148,8 +150,8 @@
               </div>
               <div class="record-right">
                 <div class="record-date">{{ fmtDate(tx.date, tx.time) }}</div>
-                <div class="record-amount" :class="tx.recordType === '收入' ? 'amount-income' : ''">
-                  {{ tx.recordType === '收入' ? '+' : '' }}￥{{ fmt(tx.amount) }}
+                <div class="record-amount" :class="amountClass(tx.recordType)">
+                  {{ amountSign(tx.recordType) }}￥{{ fmtAbs(tx.amount) }}
                 </div>
               </div>
             </div>
@@ -449,6 +451,21 @@ const statsLoading = ref(false)
 function fmt(val) {
   if (val == null) return '0.00'
   return Number(val).toFixed(2)
+}
+
+// 金额绝对值，用于固定符号前缀场景
+function fmtAbs(val) {
+  if (val == null) return '0.00'
+  return Math.abs(Number(val)).toFixed(2)
+}
+
+// 支出类（红色），其余归为收入/转账类（绿色）
+const EXPENSE_TYPES = ['支出', '手续费', '利息']
+function amountClass(recordType) {
+  return EXPENSE_TYPES.includes(recordType) ? 'amount-expense' : 'amount-income'
+}
+function amountSign(recordType) {
+  return EXPENSE_TYPES.includes(recordType) ? '-' : '+'
 }
 
 const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
@@ -896,6 +913,7 @@ onMounted(async () => {
 .record-date { font-size: 11px; color: #bbb; }
 .record-amount { font-size: 15px; font-weight: 500; color: #333; }
 .amount-income { color: #67c23a; }
+.amount-expense { color: #f56c6c; }
 .tag {
   display: inline-block; padding: 1px 6px; border-radius: 10px;
   font-size: 11px; line-height: 1.6;

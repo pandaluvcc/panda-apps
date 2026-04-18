@@ -1,5 +1,11 @@
 <template>
   <div class="import-page">
+    <div class="page-header">
+      <van-icon name="arrow-left" class="back-btn" @click="$router.back()" />
+      <span class="page-title">CSV 导入</span>
+      <span class="header-right"></span>
+    </div>
+
     <div class="import-content">
       <van-cell-group inset>
         <van-cell title="从 moze CSV 导入" />
@@ -41,7 +47,7 @@ import SnapTabbar from '@/components/snapledger/SnapTabbar.vue'
 
 const files = ref([])
 const result = ref(null)
-const activeTab = ref(3) // 导入页为第四个 tab
+const activeTab = ref(-1) // 导入页不在底部主 tab 中，通过"更多"入口进入
 
 async function handleUpload(file) {
   file.status = 'uploading'
@@ -63,6 +69,26 @@ async function handleUpload(file) {
   min-height: 100vh;
   background: #f7f8fa;
   padding-bottom: 80px;
+}
+
+.page-header {
+  background: #fff;
+  padding: 12px 16px;
+  border-bottom: 1px solid #ebedf0;
+  display: grid;
+  grid-template-columns: 32px 1fr 32px;
+  align-items: center;
+}
+.back-btn {
+  font-size: 20px;
+  color: #333;
+  cursor: pointer;
+}
+.page-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a1a1a;
+  text-align: center;
 }
 
 .import-content {
