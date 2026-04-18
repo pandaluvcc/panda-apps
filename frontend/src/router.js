@@ -156,6 +156,12 @@ const routes = [
     meta: { module: 'snapledger', transition: 'page-slide' }
   },
   {
+    path: '/snap/events/recurring/:id',
+    name: 'SnapRecurringEventDetail',
+    component: () => import('@/views/snapledger/RecurringEventDetail.vue'),
+    meta: { module: 'snapledger', transition: 'page-slide' }
+  },
+  {
     path: '/snap/events/installment',
     name: 'SnapInstallmentEvents',
     component: SnapInstallmentEvents,
