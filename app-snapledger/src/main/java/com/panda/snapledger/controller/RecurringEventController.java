@@ -74,9 +74,15 @@ public class RecurringEventController {
     }
 
     private boolean preferOver(Record candidate, Record current, RecurringEvent e) {
+        // 优先账户匹配事件主账户
         boolean candMatch = candidate.getAccount() != null && candidate.getAccount().equals(e.getAccount());
         boolean currMatch = current.getAccount() != null && current.getAccount().equals(e.getAccount());
         if (candMatch != currMatch) return candMatch;
+        // 次选：正金额胜过负金额（Moze 对 应付款项/转账 成对记录，正向语义更直观）
+        boolean candPositive = candidate.getAmount() != null && candidate.getAmount().signum() >= 0;
+        boolean currPositive = current.getAmount() != null && current.getAmount().signum() >= 0;
+        if (candPositive != currPositive) return candPositive;
+        // 再次：非 "转入" 胜过 "转入"
         boolean candTransferIn = "转入".equals(candidate.getRecordType());
         boolean currTransferIn = "转入".equals(current.getRecordType());
         if (candTransferIn != currTransferIn) return !candTransferIn;

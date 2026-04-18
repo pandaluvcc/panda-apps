@@ -9,7 +9,7 @@
         <div class="header-main">
           <div class="header-top">
             <div class="name">{{ event.name }}</div>
-            <div class="amount" :class="amountClass(event.recordType)">
+            <div class="amount" :class="eventAmountClass">
               ￥{{ fmtAmount(totalAmount) }}
             </div>
           </div>
@@ -32,7 +32,7 @@
             {{ r.periodNumber || '-' }}
           </div>
           <div class="period-date">{{ fmtPeriodDate(r.date) }}</div>
-          <div class="period-amount" :class="amountClass(r.recordType)">
+          <div class="period-amount" :class="eventAmountClass">
             ￥{{ fmtAmount(r.amount) }}
           </div>
         </div>
@@ -73,9 +73,10 @@ const scrollBox = ref(null)
 
 const TRANSFER_TYPES = ['转账', '还款', '转出', '转入', '应付款项', '应收款项', '分期还款']
 
-function amountClass(type) {
-  return TRANSFER_TYPES.includes(type) ? 'amount-red' : 'amount-green'
-}
+const eventAmountClass = computed(() => {
+  if (!event.value) return 'amount-green'
+  return TRANSFER_TYPES.includes(event.value.recordType) ? 'amount-red' : 'amount-green'
+})
 function fmtAmount(v) {
   return (Math.abs(Number(v) || 0)).toFixed(2)
 }
@@ -117,13 +118,13 @@ const subtitleText = computed(() => {
   return parts.join(' · ')
 })
 
-/** 总金额 = 已发生期（date <= today）记录金额之和。 */
+/** 总金额 = 已发生期记录金额绝对值之和（date <= today）。 */
 const totalAmount = computed(() => {
   if (!event.value?.records) return 0
   const today = new Date().toISOString().slice(0, 10)
   return event.value.records
     .filter(r => r.date <= today)
-    .reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+    .reduce((sum, r) => sum + Math.abs(Number(r.amount) || 0), 0)
 })
 
 const sortedRecords = computed(() => {

@@ -61,12 +61,15 @@ const endedList = ref([])
 
 const currentList = computed(() => {
   const raw = activeStatus.value === 'ACTIVE' ? activeList.value : endedList.value
-  // 按下次执行日期升序；空值（已结束）排最后
+  // 先按下次执行日期升序；相同日期时按期数 desc（期数大的靠前）
   return [...raw].sort((a, b) => {
     if (!a.nextDueDate && !b.nextDueDate) return 0
     if (!a.nextDueDate) return 1
     if (!b.nextDueDate) return -1
-    return a.nextDueDate < b.nextDueDate ? -1 : a.nextDueDate > b.nextDueDate ? 1 : 0
+    if (a.nextDueDate !== b.nextDueDate) {
+      return a.nextDueDate < b.nextDueDate ? -1 : 1
+    }
+    return (b.nextPeriodNumber || 0) - (a.nextPeriodNumber || 0)
   })
 })
 
