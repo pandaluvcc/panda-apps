@@ -94,4 +94,11 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
             @Param("start") LocalDate start,
             @Param("end") LocalDate end,
             @Param("status") String status);
+
+    // 周期事件关联查询
+    List<Record> findByRecurringEventIdOrderByDateDesc(Long recurringEventId);
+
+    List<Record> findByRecurringEventIdAndDateAfter(Long recurringEventId, LocalDate date);
+
+    List<Record> findByNameAndRecurringEventIdIsNull(String name);
 }
