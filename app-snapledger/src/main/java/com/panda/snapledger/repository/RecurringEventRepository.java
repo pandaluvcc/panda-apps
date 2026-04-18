@@ -9,4 +9,5 @@ public interface RecurringEventRepository extends JpaRepository<RecurringEvent, 
     List<RecurringEvent> findByStatusOrderByIdDesc(String status);
     List<RecurringEvent> findByStatusAndTotalPeriodsIsNull(String status);
     List<RecurringEvent> findByStatusAndTotalPeriodsIsNotNull(String status);
+    boolean existsByName(String name);
 }

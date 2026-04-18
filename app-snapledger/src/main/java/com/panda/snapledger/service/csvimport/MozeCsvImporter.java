@@ -1,12 +1,15 @@
 package com.panda.snapledger.service.csvimport;
 
+import com.panda.snapledger.controller.dto.RecurringEventRequest;
 import com.panda.snapledger.domain.Account;
 import com.panda.snapledger.domain.Category;
 import com.panda.snapledger.domain.Record;
 import com.panda.snapledger.repository.AccountRepository;
 import com.panda.snapledger.repository.CategoryRepository;
 import com.panda.snapledger.repository.RecordRepository;
+import com.panda.snapledger.repository.RecurringEventRepository;
 import com.panda.snapledger.service.AccountBalanceService;
+import com.panda.snapledger.service.RecurringEventService;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -45,15 +48,21 @@ public class MozeCsvImporter {
     private final CategoryRepository categoryRepository;
     private final AccountRepository accountRepository;
     private final AccountBalanceService balanceService;
+    private final RecurringEventService recurringEventService;
+    private final RecurringEventRepository recurringEventRepository;
 
     public MozeCsvImporter(RecordRepository recordRepository,
                           CategoryRepository categoryRepository,
                           AccountRepository accountRepository,
-                          AccountBalanceService balanceService) {
+                          AccountBalanceService balanceService,
+                          RecurringEventService recurringEventService,
+                          RecurringEventRepository recurringEventRepository) {
         this.recordRepository = recordRepository;
         this.categoryRepository = categoryRepository;
         this.accountRepository = accountRepository;
         this.balanceService = balanceService;
+        this.recurringEventService = recurringEventService;
+        this.recurringEventRepository = recurringEventRepository;
     }
 
     public ImportResult importFromCsv(MultipartFile file) throws IOException {
@@ -158,8 +167,68 @@ public class MozeCsvImporter {
             }
         }
 
+        // === 步骤4：为预设名称创建周期事件（按名称回溯挂接本次及历史同名记录）===
+        ensurePredefinedRecurringEvents();
+
         return new ImportResult(savedCount, accounts.size(), categories.size(), skippedCount);
     }
+
+    /**
+     * 在 CSV 导入流程的末尾，为几个固定名称创建周期事件（若不存在）。
+     * 创建时按 name 扫描历史同名 record 自动挂接期数。
+     */
+    void ensurePredefinedRecurringEvents() {
+        for (PredefinedRecurring preset : PREDEFINED_RECURRING) {
+            try {
+                if (recurringEventRepository.existsByName(preset.name)) continue;
+                LocalDate earliest = recordRepository
+                    .findByNameAndRecurringEventIdIsNull(preset.name)
+                    .stream()
+                    .map(Record::getDate)
+                    .filter(java.util.Objects::nonNull)
+                    .min(Comparator.naturalOrder())
+                    .orElse(null);
+                if (earliest == null) {
+                    log.info("跳过周期事件创建：未找到同名记录 name={}", preset.name);
+                    continue;
+                }
+                RecurringEventRequest req = new RecurringEventRequest();
+                req.setName(preset.name);
+                req.setRecordType(preset.recordType);
+                req.setAmount(preset.amount);
+                req.setMainCategory(preset.mainCategory);
+                req.setAccount(preset.account);
+                req.setTargetAccount(preset.targetAccount);
+                req.setIntervalType("MONTHLY");
+                req.setIntervalValue(1);
+                req.setDayOfMonth(preset.dayOfMonth);
+                req.setStartDate(earliest);
+                recurringEventService.create(req);
+                log.info("CSV导入：创建周期事件 name={}, startDate={}", preset.name, earliest);
+            } catch (Exception e) {
+                log.warn("创建周期事件失败 name={}: {}", preset.name, e.getMessage());
+            }
+        }
+    }
+
+    private static final List<PredefinedRecurring> PREDEFINED_RECURRING = List.of(
+        new PredefinedRecurring("预缴当月房贷", "转账",
+            new BigDecimal("4300.00"), null, "招行朝朝宝°", "中信银行", 19),
+        new PredefinedRecurring("商贷", "支出",
+            new BigDecimal("2985.34"), "房产", "中信银行", null, 20),
+        new PredefinedRecurring("公积金贷款", "支出",
+            new BigDecimal("1200.51"), "房产", "中信银行", null, 20)
+    );
+
+    private record PredefinedRecurring(
+            String name,
+            String recordType,
+            BigDecimal amount,
+            String mainCategory,
+            String account,
+            String targetAccount,
+            int dayOfMonth
+    ) {}
 
     @Transactional
     public void saveAccountsBatch(Set<String> accounts) {
