@@ -115,8 +115,10 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
 
     List<Record> findByParentRecordIdIn(List<Long> parentIds);
 
-    @Query("SELECT r FROM Record r WHERE r.recordType IN ('应收款项','应付款项') " +
-           "AND r.parentRecordId IS NULL ORDER BY r.date DESC, r.time DESC")
+    @Query("SELECT r FROM Record r WHERE r.parentRecordId IS NULL " +
+           "AND ((r.recordType = '应收款项' AND r.amount < 0) " +
+           "  OR (r.recordType = '应付款项' AND r.amount > 0)) " +
+           "ORDER BY r.date DESC, r.time DESC")
     List<Record> findAllReceivableParents();
 
     @Query("SELECT r FROM Record r WHERE r.recordType IN ('应收款项','应付款项') " +
