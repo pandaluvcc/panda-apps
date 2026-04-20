@@ -88,6 +88,12 @@ public class Record {
     @Column(name = "period_number")
     private Integer periodNumber;
 
+    @Column(name = "installment_event_id")
+    private Long installmentEventId;
+
+    @Column(name = "installment_period_number")
+    private Integer installmentPeriodNumber;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

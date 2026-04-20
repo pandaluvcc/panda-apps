@@ -101,4 +101,10 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
     List<Record> findByRecurringEventIdAndDateAfter(Long recurringEventId, LocalDate date);
 
     List<Record> findByNameAndRecurringEventIdIsNull(String name);
+
+    // 分期事件关联查询
+    List<Record> findByInstallmentEventIdOrderByDateAsc(Long installmentEventId);
+
+    // 删除分期事件前解绑所有关联记录（通过 @Modifying 在 Service 中调用）
+    List<Record> findByInstallmentEventId(Long installmentEventId);
 }

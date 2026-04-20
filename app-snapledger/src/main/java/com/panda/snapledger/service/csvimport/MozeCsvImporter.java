@@ -10,6 +10,7 @@ import com.panda.snapledger.repository.RecordRepository;
 import com.panda.snapledger.repository.RecurringEventRepository;
 import com.panda.snapledger.service.AccountBalanceService;
 import com.panda.snapledger.service.RecurringEventService;
+import com.panda.snapledger.service.installment.InstallmentDetectionService;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -50,19 +51,22 @@ public class MozeCsvImporter {
     private final AccountBalanceService balanceService;
     private final RecurringEventService recurringEventService;
     private final RecurringEventRepository recurringEventRepository;
+    private final InstallmentDetectionService installmentDetectionService;
 
     public MozeCsvImporter(RecordRepository recordRepository,
                           CategoryRepository categoryRepository,
                           AccountRepository accountRepository,
                           AccountBalanceService balanceService,
                           RecurringEventService recurringEventService,
-                          RecurringEventRepository recurringEventRepository) {
+                          RecurringEventRepository recurringEventRepository,
+                          InstallmentDetectionService installmentDetectionService) {
         this.recordRepository = recordRepository;
         this.categoryRepository = categoryRepository;
         this.accountRepository = accountRepository;
         this.balanceService = balanceService;
         this.recurringEventService = recurringEventService;
         this.recurringEventRepository = recurringEventRepository;
+        this.installmentDetectionService = installmentDetectionService;
     }
 
     public ImportResult importFromCsv(MultipartFile file) throws IOException {
@@ -169,6 +173,13 @@ public class MozeCsvImporter {
 
         // === 步骤4：为预设名称创建周期事件（按名称回溯挂接本次及历史同名记录）===
         ensurePredefinedRecurringEvents();
+
+        // === 步骤5：识别分期事件（清空重建，幂等）===
+        try {
+            installmentDetectionService.detectAll();
+        } catch (Exception e) {
+            log.warn("分期识别失败: {}", e.getMessage(), e);
+        }
 
         return new ImportResult(savedCount, accounts.size(), categories.size(), skippedCount);
     }

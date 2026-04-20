@@ -167,6 +167,12 @@ const routes = [
     component: SnapInstallmentEvents,
     meta: { module: 'snapledger', transition: 'page-slide' }
   },
+  {
+    path: '/snap/events/installment/:id',
+    name: 'SnapInstallmentEventDetail',
+    component: () => import('@/views/snapledger/InstallmentEventDetail.vue'),
+    meta: { module: 'snapledger', transition: 'page-slide' }
+  },
 
   // ========== 工具路由 ==========
   {

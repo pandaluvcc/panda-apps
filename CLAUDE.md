@@ -215,10 +215,19 @@ SNAPLEDGER_DB_PASSWORD=your_password
 - `GET/POST /api/snapledger/account` - Account management
 - `GET /api/snapledger/accounts/:id/transactions` - Account transaction list (by period)
 - `GET /api/snapledger/accounts/:id/summary` - Period summary statistics
+- `PUT /api/snapledger/accounts/:masterId/sub-accounts/batch` - 批量关联/解绑子账户
 - `GET /api/snapledger/calendar` - Monthly calendar data
 - `GET/POST /api/snapledger/stats` - Statistics
 - `GET/POST /api/snapledger/budget` - Budget management
 - `POST /api/snapledger/ocr` - OCR receipt recognition
+- `POST /api/snapledger/import` - Moze CSV 导入（一次性接口，用于首次导入历史数据）
+- `GET/POST/PUT/DELETE /api/snapledger/recurring-events` - 周期事件 CRUD
+- `GET /api/snapledger/recurring-events?status=ACTIVE|ENDED` - 周期事件列表
+- `GET /api/snapledger/recurring-events/:id` - 周期事件详情（含每期 Record）
+- `POST /api/snapledger/recurring-events/:id/end` - 结束周期事件
+- `GET /api/snapledger/installment-events?status=ACTIVE|ENDED` - 分期事件列表
+- `GET /api/snapledger/installment-events/:id` - 分期事件详情（含每期本金/利息/合计）
+- `POST /api/snapledger/installment-events/detect` - 手动重建分期识别（调试用）
 
 ### WeChat Remote Control
 - `GET /wechat` - WeChat server verification
@@ -276,6 +285,85 @@ Moze CSV 导入的记录包含 13 种 `recordType`，系统按以下矩阵分类
 **信用卡还款窗口期**：信用卡账户的还款记录不按账单周期 `[startDate, endDate]` 查询，而是按还款窗口期 `[cycleEnd+1, dueDate]` 查询。例如账单周期 12/03-01/02、到期还款日 20 号 → 还款窗口 01/03-01/20。
 
 **Moze CSV 转账格式**：Moze 导出的转账/还款记录使用 `转出`/`转入` 成对记录（各一侧），`对象` 字段为空。手动录入的转账使用 `转账`/`还款` 类型，有 `target` 字段。
+
+**Moze CSV 列映射（16 列）**：`账户、币种、记录类型、主类别、子类别、金额、手续费、折扣、名称、商家、日期、时间、项目、描述、标签、对象`。注意"对象"是第 16 列且常为空；商户分期的利息标记（如 `LibertyKostume・采用固定利息`）实际在第 14 列"描述"中。
+
+## Recurring Events (周期事件)
+
+按固定间隔（日/周/月/年）自动生成记账记录的事件机制，对齐 Moze 的"周期"概念。
+
+### 核心字段（`RecurringEvent`）
+- `intervalType`: `DAILY` / `WEEKLY` / `MONTHLY` / `YEARLY`
+- `intervalValue`: 间隔数量（默认 1）
+- `dayOfMonth` / `dayOfWeek`: 月度/周度日期锚点
+- `startDate`: 首期日期
+- `totalPeriods`: 总期数（null = 无限期）
+- `generatedUntil`: 已预生成到的日期（调度器用）
+- `status`: `ACTIVE` / `ENDED`
+
+### Record 关联
+- `Record.recurringEventId`: 软关联到周期事件
+- `Record.periodNumber`: 第几期
+
+### 预设周期事件
+`MozeCsvImporter.ensurePredefinedRecurringEvents()` 在 CSV 导入末尾自动创建并回溯挂接：
+- 预缴当月房贷（招行朝朝宝° → 中信银行，每月 19 号 4300）
+- 商贷（中信银行，每月 20 号 2985.34，别名"应交当月房贷"）
+- 公积金贷款（中信银行，每月 20 号 1200.51）
+
+### 调度与补发
+- `RecurringEventScheduler`: 定时任务，按 `intervalType` 提前生成未来若干期 Record
+- `RecurringEventService.backfillOrphansForEvent/ByAliases`: 按名称/别名回溯挂接历史同名 Record
+
+### 前端
+- `views/snapledger/RecurringEvents.vue` - 列表（进行中/已结束 Tab）
+- `views/snapledger/RecurringEventDetail.vue` - 详情（含每期记录，支持修改本期/从某期起/整个事件）
+- Moze 转账类事件成对生成 (转出/转入)，详情页按 `periodNumber` 去重显示一条
+
+## Installment Events (分期事件)
+
+从 Moze CSV 启发式归并的只读分期展示，**数据源只有 CSV 导入**，无手动创建入口。
+
+### 识别算法（`InstallmentDetectionService.detectAll`）
+
+CSV 导入末尾自动触发，**清空重建** InstallmentEvent（幂等）。通用规则：
+
+| 环节 | 规则 |
+|---|---|
+| 候选筛选 | `Account.isCreditAccount=true` + 金额<0 + `recordType ∈ {支出, 分期还款}` + 有精确时间戳 |
+| 归并键 | `(account, 名称\|子类别, HH:mm)` —— Moze 分期自动克隆购买时间戳 |
+| 判定 | ≥3 期 + 相邻间隔 23-36 天 + 总跨度约 N-1 月 |
+
+### 关联记录
+候选本金记录确定后，按日期扩展：
+- **利息关联**：
+  - 商户分期：利息 Record 的 `description` 含 `<商品名>・` → 匹配同账户下事件
+  - 账单分期：利息 Record 同 `(account, date)` → 匹配 BILL_INSTALLMENT 事件
+- **折扣关联**：`recordType=折扣` + 同 `(account, date)` 的本金记录 → 挂到事件
+- **年利率提取**：从利息记录 `description` 正则 `年利率 X.X%` 提取
+
+### 金额计算
+- **每期净本金** = 本金记录绝对值 − 同日折扣
+- `principalTotal` = Σ(每期净本金)
+- `interestTotal` = Σ(利息绝对值)
+- `totalAmount` = principalTotal + interestTotal
+- `perPeriodAmount` = 末期净本金 + 末期利息（列表展示用）
+
+### 关键字段
+- `InstallmentEvent`: `principalTotal` / `interestTotal` / `totalAmount` / `yearRate`(可空) / `status`
+- `Record.installmentEventId` / `Record.installmentPeriodNumber`
+
+### 前端
+- `views/snapledger/InstallmentEvents.vue` - 列表（进行中/已结束 Tab）+ **点击弹出详情卡片**（详情非独立路由）
+  - Tab 状态通过 `sessionStorage('snap.installment.activeTab')` 持久化
+  - 列表按 `lastDate` 倒序
+- 详情卡片结构：header（图标/名称/副标题/总金额） + 6 项本金利息总计 + 每期列表（编号胶囊 + 本金·利息副标题 + 年利率徽章）
+- `views/snapledger/InstallmentEventDetail.vue` + 路由仍保留作为深链备份
+
+### 未来扩展注意事项
+1. 识别阈值 `≥3 期`：2 期分期极少见且易误判，如需支持需增强其他判据
+2. 若信用卡上有月度定时自动扣款订阅（连续 ≥3 月），会被误识别为分期
+3. Moze CSV 格式变更（列顺序/分隔符/标记字符）会失效识别，需同步调整
 
 ## Master-Sub Account Management
 
