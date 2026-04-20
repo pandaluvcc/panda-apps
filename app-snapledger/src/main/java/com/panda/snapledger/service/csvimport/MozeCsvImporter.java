@@ -52,6 +52,7 @@ public class MozeCsvImporter {
     private final RecurringEventService recurringEventService;
     private final RecurringEventRepository recurringEventRepository;
     private final InstallmentDetectionService installmentDetectionService;
+    private final com.panda.snapledger.service.receivable.ReceivableLinkingService receivableLinkingService;
 
     public MozeCsvImporter(RecordRepository recordRepository,
                           CategoryRepository categoryRepository,
@@ -59,7 +60,8 @@ public class MozeCsvImporter {
                           AccountBalanceService balanceService,
                           RecurringEventService recurringEventService,
                           RecurringEventRepository recurringEventRepository,
-                          InstallmentDetectionService installmentDetectionService) {
+                          InstallmentDetectionService installmentDetectionService,
+                          com.panda.snapledger.service.receivable.ReceivableLinkingService receivableLinkingService) {
         this.recordRepository = recordRepository;
         this.categoryRepository = categoryRepository;
         this.accountRepository = accountRepository;
@@ -67,6 +69,7 @@ public class MozeCsvImporter {
         this.recurringEventService = recurringEventService;
         this.recurringEventRepository = recurringEventRepository;
         this.installmentDetectionService = installmentDetectionService;
+        this.receivableLinkingService = receivableLinkingService;
     }
 
     public ImportResult importFromCsv(MultipartFile file) throws IOException {
@@ -179,6 +182,13 @@ public class MozeCsvImporter {
             installmentDetectionService.detectAll();
         } catch (Exception e) {
             log.warn("分期识别失败: {}", e.getMessage(), e);
+        }
+
+        // === 步骤6：建立应收应付父子关系（清空重建，幂等）===
+        try {
+            receivableLinkingService.linkAll();
+        } catch (Exception e) {
+            log.warn("应收应付建链失败: {}", e.getMessage(), e);
         }
 
         return new ImportResult(savedCount, accounts.size(), categories.size(), skippedCount);

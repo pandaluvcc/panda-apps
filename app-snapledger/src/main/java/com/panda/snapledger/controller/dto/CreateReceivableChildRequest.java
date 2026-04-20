@@ -1,0 +1,16 @@
+package com.panda.snapledger.controller.dto;
+
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalTime;
+
+@Data
+public class CreateReceivableChildRequest {
+    private String account;
+    private BigDecimal amount;
+    private LocalDate date;
+    private LocalTime time;
+    private String description;
+}

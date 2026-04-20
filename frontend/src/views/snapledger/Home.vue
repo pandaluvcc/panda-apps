@@ -74,8 +74,8 @@
                 <!-- 主账户行（带 children） -->
                 <div
                   :class="['account-row', { 'master-account-row': acc.isMasterAccount, 'virtual-account-row': acc.isVirtual }]"
-                  :style="{ cursor: acc.isVirtual ? 'default' : 'pointer' }"
-                  @click="!acc.isVirtual && $router.push('/snap/account/' + acc.id)"
+                  style="cursor: pointer"
+                  @click="handleAccountClick(acc)"
                 >
                   <div class="account-name-wrap">
                     <span class="account-name">{{ acc.name }}</span>
@@ -111,8 +111,12 @@
 
 <script setup>
 import { ref, computed, onMounted, reactive } from 'vue'
+import { useRouter } from 'vue-router'
 import { getAccounts } from '@/api'
+import { getReceivablesSummary } from '@/api/snapledger/receivable'
 import SnapTabbar from '@/components/snapledger/SnapTabbar.vue'
+
+const router = useRouter()
 
 const activeTab = ref(0)
 const amountVisible = ref(true)
@@ -135,19 +139,28 @@ const GROUP_ORDER = ['第三方支付', '现金', '银行', '信用卡', '证券
 
 // 虚拟账户：非真实账户实体，仅作展示占位。后续真实功能接入后替换 balance 来源即可。
 // 放在"其他"分组。isVirtual=true 用于跳过路由跳转。
-const VIRTUAL_ACCOUNTS = [
+const VIRTUAL_ACCOUNTS = reactive([
   {
     id: 'virtual-receivable-payable',
     name: '应收应付款项',
     subtitle: '追踪你的借还款历史',
-    balance: -37842.18,
+    balance: 0,
     accountGroup: '其他',
     isVirtual: true,
     includeInTotal: true,
     isArchived: false,
     sortOrder: 9999
   }
-]
+])
+
+function handleAccountClick(acc) {
+  if (acc.id === 'virtual-receivable-payable') {
+    router.push('/snap/receivables')
+    return
+  }
+  if (acc.isVirtual) return
+  router.push('/snap/account/' + acc.id)
+}
 
 // 构建账户层级树：主账户 + children[] 子账户
 const accountHierarchy = computed(() => {
@@ -183,8 +196,12 @@ const accountHierarchy = computed(() => {
 
 onMounted(async () => {
   try {
-    const res = await getAccounts()
-    accounts.value = res || []
+    const [accountsRes, summaryRes] = await Promise.all([
+      getAccounts(),
+      getReceivablesSummary().catch(() => ({ netAmount: 0 }))
+    ])
+    accounts.value = accountsRes || []
+    VIRTUAL_ACCOUNTS[0].balance = Number(summaryRes?.netAmount) || 0
   } catch (e) {
     console.error('Failed to load accounts:', e)
   } finally {

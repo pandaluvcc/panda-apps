@@ -155,6 +155,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { createRecord, updateRecord, deleteRecord, getRecordById, getCategories, getAccounts } from '@/api'
+import { createReceivable } from '@/api/snapledger/receivable'
 import { createRecurringEvent } from '@/api/snapledger/recurringEvent'
 import { formatDateISO } from '@/utils/format'
 import SnapTabbar from '@/components/snapledger/SnapTabbar.vue'
@@ -398,6 +399,23 @@ async function save() {
       await createRecurringEvent(payload)
       showToast('周期事件已创建')
       router.push('/snap/events/recurring')
+      return
+    }
+
+    if (['应收款项', '应付款项'].includes(form.value.recordType)) {
+      await createReceivable({
+        recordType: form.value.recordType,
+        subCategory: form.value.subCategory,
+        name: form.value.name || form.value.mainCategory,
+        account: form.value.account,
+        amount: Number(form.value.amount),
+        date: form.value.date,
+        time: form.value.time,
+        target: form.value.target,
+        description: form.value.description
+      })
+      showToast('已保存')
+      router.push('/snap/receivables')
       return
     }
 

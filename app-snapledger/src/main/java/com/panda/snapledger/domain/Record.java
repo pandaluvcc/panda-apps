@@ -94,6 +94,9 @@ public class Record {
     @Column(name = "installment_period_number")
     private Integer installmentPeriodNumber;
 
+    @Column(name = "parent_record_id")
+    private Long parentRecordId;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

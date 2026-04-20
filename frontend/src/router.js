@@ -173,6 +173,18 @@ const routes = [
     component: () => import('@/views/snapledger/InstallmentEventDetail.vue'),
     meta: { module: 'snapledger', transition: 'page-slide' }
   },
+  {
+    path: '/snap/receivables',
+    name: 'SnapReceivables',
+    component: () => import('@/views/snapledger/Receivables.vue'),
+    meta: { module: 'snapledger', transition: 'page-slide' }
+  },
+  {
+    path: '/snap/receivables/:parentId/new-child',
+    name: 'SnapReceivableChildForm',
+    component: () => import('@/views/snapledger/ReceivableChildForm.vue'),
+    meta: { module: 'snapledger', transition: 'page-slide' }
+  },
 
   // ========== 工具路由 ==========
   {

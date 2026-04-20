@@ -2,6 +2,7 @@ package com.panda.snapledger.repository;
 
 import com.panda.snapledger.domain.Record;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -107,4 +108,23 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
 
     // 删除分期事件前解绑所有关联记录（通过 @Modifying 在 Service 中调用）
     List<Record> findByInstallmentEventId(Long installmentEventId);
+
+    // ========== 应收应付款项 ==========
+
+    List<Record> findByParentRecordId(Long parentRecordId);
+
+    List<Record> findByParentRecordIdIn(List<Long> parentIds);
+
+    @Query("SELECT r FROM Record r WHERE r.recordType IN ('应收款项','应付款项') " +
+           "AND r.parentRecordId IS NULL ORDER BY r.date DESC, r.time DESC")
+    List<Record> findAllReceivableParents();
+
+    @Query("SELECT r FROM Record r WHERE r.recordType IN ('应收款项','应付款项') " +
+           "ORDER BY r.account, r.name, r.recordType, r.date, r.time")
+    List<Record> findAllReceivableForLinking();
+
+    @Modifying
+    @Query("UPDATE Record r SET r.parentRecordId = NULL " +
+           "WHERE r.recordType IN ('应收款项','应付款项')")
+    int clearAllReceivableParentLinks();
 }
