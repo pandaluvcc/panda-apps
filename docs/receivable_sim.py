@@ -79,24 +79,16 @@ for key, group in groups.items():
         if is_parent(r):
             queue.append([r, r["amount"].copy_abs()])
             continue
-        remaining = r["amount"].copy_abs()
-        linked_once = False
-        while remaining > 0 and queue:
-            head = queue[0]
-            if not linked_once:
-                total_linked += 1
-                linked_once = True
-            take = min(head[1], remaining)
-            head[1] -= take
-            remaining -= take
-            if head[1] <= 0:
-                queue.pop(0)
-        if remaining > 0 and not linked_once:
-            # Never linked to any parent (queue was empty from start)
+        # 子记录挂到队首主记录，金额溢出丢弃（对应 DB 里单一 parentRecordId 的语义）
+        if not queue:
             orphan_children.append(r)
-        elif remaining > 0:
-            # Linked to at least one parent but had overflow — that's OK, just lost
-            pass
+            continue
+        head = queue[0]
+        total_linked += 1
+        child_abs = r["amount"].copy_abs()
+        head[1] -= child_abs
+        if head[1] <= 0:
+            queue.pop(0)
     for item in queue:
         unpaired_parents.append(item)
 
@@ -118,20 +110,11 @@ for c in orphan_children:
     if not q:
         still_orphan.append(c)
         continue
-    remaining = c["amount"].copy_abs()
-    linked_once = False
-    while remaining > 0 and q:
-        head = q[0]
-        if not linked_once:
-            total_linked += 1
-            linked_once = True
-        take = min(head[1], remaining)
-        head[1] -= take
-        remaining -= take
-        if head[1] <= 0:
-            q.pop(0)
-    if not linked_once:
-        still_orphan.append(c)
+    head = q[0]
+    total_linked += 1
+    head[1] -= c["amount"].copy_abs()
+    if head[1] <= 0:
+        q.pop(0)
 orphan_children = still_orphan
 unpaired_parents = named_unpaired + [item for q in fallback_queues.values() for item in q]
 

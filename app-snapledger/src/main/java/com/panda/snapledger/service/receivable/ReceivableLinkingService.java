@@ -85,21 +85,12 @@ public class ReceivableLinkingService {
         for (Record child : orphans) {
             Deque<PendingParent> q = fallback.get(fallbackKey(child));
             if (q == null || q.isEmpty()) continue;
-            BigDecimal remaining = child.getAmount().abs();
-            boolean linkedOnce = false;
-            while (remaining.signum() > 0 && !q.isEmpty()) {
-                PendingParent head = q.peek();
-                if (!linkedOnce) {
-                    child.setParentRecordId(head.parent.getId());
-                    recordRepository.save(child);
-                    linkedCount++;
-                    linkedOnce = true;
-                }
-                BigDecimal take = head.remaining.min(remaining);
-                head.remaining = head.remaining.subtract(take);
-                remaining = remaining.subtract(take);
-                if (head.remaining.signum() <= 0) q.poll();
-            }
+            PendingParent head = q.peek();
+            child.setParentRecordId(head.parent.getId());
+            recordRepository.save(child);
+            linkedCount++;
+            head.remaining = head.remaining.subtract(child.getAmount().abs());
+            if (head.remaining.signum() <= 0) q.poll();
         }
 
         int unpairedCount = 0;
@@ -139,25 +130,18 @@ public class ReceivableLinkingService {
                 queue.add(new PendingParent(r, r.getAmount().abs()));
                 continue;
             }
-            // 子方向：按 FIFO 消耗队首，溢出继续扣下一主
-            BigDecimal remaining = r.getAmount().abs();
-            boolean linkedOnce = false;
-            while (remaining.signum() > 0 && !queue.isEmpty()) {
-                PendingParent head = queue.peek();
-                if (!linkedOnce) {
-                    r.setParentRecordId(head.parent.getId());
-                    recordRepository.save(r);
-                    linked++;
-                    linkedOnce = true;
-                }
-                BigDecimal take = head.remaining.min(remaining);
-                head.remaining = head.remaining.subtract(take);
-                remaining = remaining.subtract(take);
-                if (head.remaining.signum() <= 0) queue.poll();
-            }
-            if (!linkedOnce) {
+            // 子方向：一子对一父；DB 里 parentRecordId 单值，所以不做溢出级联
+            // （如同 Moze：超额还款只让主记录标记完成，溢出不再冲抵下一主）
+            if (queue.isEmpty()) {
                 orphans.add(r);
+                continue;
             }
+            PendingParent head = queue.peek();
+            r.setParentRecordId(head.parent.getId());
+            recordRepository.save(r);
+            linked++;
+            head.remaining = head.remaining.subtract(r.getAmount().abs());
+            if (head.remaining.signum() <= 0) queue.poll();
         }
         List<PendingParent> unpaired = new ArrayList<>(queue);
         return new GroupResult(linked, unpaired, orphans);
