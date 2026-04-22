@@ -5,6 +5,7 @@ import com.panda.snapledger.controller.dto.CreateReceivableRequest;
 import com.panda.snapledger.controller.dto.ReceivableResponse;
 import com.panda.snapledger.controller.dto.ReceivableSummaryResponse;
 import com.panda.snapledger.domain.Record;
+import com.panda.snapledger.service.receivable.ReceivableLinkingService;
 import com.panda.snapledger.service.receivable.ReceivableService;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.web.bind.annotation.*;
@@ -17,9 +18,18 @@ import java.util.List;
 public class ReceivableController {
 
     private final ReceivableService receivableService;
+    private final ReceivableLinkingService linkingService;
 
-    public ReceivableController(ReceivableService receivableService) {
+    public ReceivableController(ReceivableService receivableService,
+                                ReceivableLinkingService linkingService) {
         this.receivableService = receivableService;
+        this.linkingService = linkingService;
+    }
+
+    @PostMapping("/relink")
+    @Operation(summary = "重新运行应收应付启发式建链（清空重建，不需要重导 CSV）")
+    public ReceivableLinkingService.LinkStats relink() {
+        return linkingService.linkAll();
     }
 
     @GetMapping

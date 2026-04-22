@@ -40,11 +40,12 @@ public class ReceivableLinkingService {
     }
 
     @Transactional
-    public void linkAll() {
+    public LinkStats linkAll() {
         int cleared = recordRepository.clearAllReceivableParentLinks();
-        log.info("Cleared {} existing receivable parent links", cleared);
+        log.info("Receivable link: cleared {} existing parent links", cleared);
 
         List<Record> all = recordRepository.findAllReceivableForLinking();
+        log.info("Receivable link: scanning {} records", all.size());
 
         Map<String, List<Record>> groups = new LinkedHashMap<>();
         for (Record r : all) {
@@ -52,11 +53,25 @@ public class ReceivableLinkingService {
         }
 
         int linkedCount = 0;
-        for (List<Record> group : groups.values()) {
-            linkedCount += processGroup(group);
+        int unpairedParents = 0;
+        BigDecimal unpairedTotal = BigDecimal.ZERO;
+        for (Map.Entry<String, List<Record>> e : groups.entrySet()) {
+            GroupResult gr = processGroup(e.getValue());
+            linkedCount += gr.linked;
+            unpairedParents += gr.unpairedParents;
+            unpairedTotal = unpairedTotal.add(gr.unpairedAmount);
+            if (gr.unpairedParents > 0) {
+                log.info("  group [{}]: size={} linked={} unpairedParents={} unpairedAmount={}",
+                        e.getKey(), e.getValue().size(), gr.linked, gr.unpairedParents, gr.unpairedAmount);
+            }
         }
-        log.info("Linked {} receivable child records across {} groups", linkedCount, groups.size());
+        log.info("Receivable link: groups={} linked={} unpairedParents={} unpairedAmountAbsSum={}",
+                groups.size(), linkedCount, unpairedParents, unpairedTotal);
+        return new LinkStats(groups.size(), linkedCount, unpairedParents, unpairedTotal);
     }
+
+    public record LinkStats(int groups, int linked, int unpairedParents, BigDecimal unpairedAmount) {}
+    private record GroupResult(int linked, int unpairedParents, BigDecimal unpairedAmount) {}
 
     private String groupKey(Record r) {
         String name = r.getName() == null ? "" : r.getName();
@@ -73,11 +88,7 @@ public class ReceivableLinkingService {
      * - 子方向金额：按 FIFO 扣减队首主记录剩余额，parentRecordId 指向队首
      * 主方向判定：应收款项=负 / 应付款项=正
      */
-    private int processGroup(List<Record> group) {
-        // 组内排序：
-        // 1) 日期升序
-        // 2) 同一天内主方向记录优先（跨账户配对的借/还可能被用户以任意顺序录入）
-        // 3) 同方向下按时间升序
+    private GroupResult processGroup(List<Record> group) {
         group.sort(Comparator
                 .comparing((Record r) -> r.getDate() == null ? LocalDate.MIN : r.getDate())
                 .thenComparing((Record r) -> isParentDirection(r) ? 0 : 1)
@@ -90,8 +101,8 @@ public class ReceivableLinkingService {
                 continue;
             }
             if (queue.isEmpty()) {
-                log.warn("Orphan child (no parent in queue): id={} name={} amount={}",
-                        r.getId(), r.getName(), r.getAmount());
+                log.warn("Orphan child (no parent in queue): id={} name={} account={} amount={} date={}",
+                        r.getId(), r.getName(), r.getAccount(), r.getAmount(), r.getDate());
                 continue;
             }
             BigDecimal remaining = r.getAmount().abs();
@@ -104,7 +115,12 @@ public class ReceivableLinkingService {
                 queue.poll();
             }
         }
-        return linked;
+        int unpaired = queue.size();
+        BigDecimal unpairedAmt = BigDecimal.ZERO;
+        for (PendingParent p : queue) {
+            unpairedAmt = unpairedAmt.add(p.remaining);
+        }
+        return new GroupResult(linked, unpaired, unpairedAmt);
     }
 
     private boolean isParentDirection(Record r) {
