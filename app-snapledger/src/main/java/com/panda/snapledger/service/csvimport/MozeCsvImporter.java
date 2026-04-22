@@ -53,6 +53,7 @@ public class MozeCsvImporter {
     private final RecurringEventRepository recurringEventRepository;
     private final InstallmentDetectionService installmentDetectionService;
     private final com.panda.snapledger.service.receivable.ReceivableLinkingService receivableLinkingService;
+    private final com.panda.snapledger.service.recurring.RecurringEventScheduler recurringEventScheduler;
 
     public MozeCsvImporter(RecordRepository recordRepository,
                           CategoryRepository categoryRepository,
@@ -61,7 +62,8 @@ public class MozeCsvImporter {
                           RecurringEventService recurringEventService,
                           RecurringEventRepository recurringEventRepository,
                           InstallmentDetectionService installmentDetectionService,
-                          com.panda.snapledger.service.receivable.ReceivableLinkingService receivableLinkingService) {
+                          com.panda.snapledger.service.receivable.ReceivableLinkingService receivableLinkingService,
+                          com.panda.snapledger.service.recurring.RecurringEventScheduler recurringEventScheduler) {
         this.recordRepository = recordRepository;
         this.categoryRepository = categoryRepository;
         this.accountRepository = accountRepository;
@@ -70,6 +72,7 @@ public class MozeCsvImporter {
         this.recurringEventRepository = recurringEventRepository;
         this.installmentDetectionService = installmentDetectionService;
         this.receivableLinkingService = receivableLinkingService;
+        this.recurringEventScheduler = recurringEventScheduler;
     }
 
     public ImportResult importFromCsv(MultipartFile file) throws IOException {
@@ -176,6 +179,12 @@ public class MozeCsvImporter {
 
         // === 步骤4：为预设名称创建周期事件（按名称回溯挂接本次及历史同名记录）===
         ensurePredefinedRecurringEvents();
+        // 触发调度器扩展未来窗口（生成 未开始 Tab 所需的未来期 Record）
+        try {
+            recurringEventScheduler.extendInfiniteWindows();
+        } catch (Exception e) {
+            log.warn("扩展周期事件窗口失败: {}", e.getMessage(), e);
+        }
 
         // === 步骤5：识别分期事件（清空重建，幂等）===
         try {
@@ -207,15 +216,23 @@ public class MozeCsvImporter {
                         .findFirst();
                 Long eventId;
                 if (existing.isPresent()) {
-                    eventId = existing.get().getId();
+                    com.panda.snapledger.domain.RecurringEvent ev = existing.get();
+                    eventId = ev.getId();
+                    // 如果事件配置和预设不一致，修复并清理过时的未来记录
+                    boolean changed = repairEventIfNeeded(ev, preset);
                     recurringEventService.backfillOrphansForEvent(eventId);
-                    log.info("CSV导入：回溯挂接新孤儿到已有周期事件 name={}", preset.name);
+                    if (changed) {
+                        log.info("CSV导入：修复周期事件配置 name={}", preset.name);
+                    } else {
+                        log.info("CSV导入：回溯挂接新孤儿到已有周期事件 name={}", preset.name);
+                    }
                 } else {
                     RecurringEventRequest req = new RecurringEventRequest();
                     req.setName(preset.name);
                     req.setRecordType(preset.recordType);
                     req.setAmount(preset.amount);
                     req.setMainCategory(preset.mainCategory);
+                    req.setSubCategory(preset.subCategory);
                     req.setAccount(preset.account);
                     req.setTargetAccount(preset.targetAccount);
                     req.setIntervalType("MONTHLY");
@@ -236,15 +253,56 @@ public class MozeCsvImporter {
         }
     }
 
+    /**
+     * 修复已存在的周期事件：若配置与预设不一致则更新，并清理未来方向上的过时生成记录，
+     * 让调度器的下次窗口扩展按新配置重新生成。
+     */
+    private boolean repairEventIfNeeded(com.panda.snapledger.domain.RecurringEvent ev,
+                                         PredefinedRecurring preset) {
+        boolean changed = false;
+        if (!java.util.Objects.equals(ev.getRecordType(), preset.recordType)) {
+            ev.setRecordType(preset.recordType); changed = true;
+        }
+        if (!java.util.Objects.equals(ev.getMainCategory(), preset.mainCategory)) {
+            ev.setMainCategory(preset.mainCategory); changed = true;
+        }
+        if (!java.util.Objects.equals(ev.getSubCategory(), preset.subCategory)) {
+            ev.setSubCategory(preset.subCategory); changed = true;
+        }
+        if (!java.util.Objects.equals(ev.getAccount(), preset.account)) {
+            ev.setAccount(preset.account); changed = true;
+        }
+        if (!java.util.Objects.equals(ev.getTargetAccount(), preset.targetAccount)) {
+            ev.setTargetAccount(preset.targetAccount); changed = true;
+        }
+        if (changed) {
+            // 清理过时的未来生成记录（date > today 且挂在此 event 下的，会以新配置重新生成）
+            LocalDate today = LocalDate.now();
+            List<Record> future = recordRepository.findByRecurringEventIdAndDateAfter(ev.getId(), today.minusDays(1));
+            List<Record> toDelete = future.stream()
+                    .filter(r -> !java.util.Objects.equals(r.getRecordType(), preset.recordType))
+                    .toList();
+            recordRepository.deleteAll(toDelete);
+            // 重置 generated_until 让调度器立即重新扩展窗口
+            ev.setGeneratedUntil(today.minusDays(1));
+            recurringEventRepository.save(ev);
+            log.info("CSV导入：事件 {} 配置变化，清理 {} 条过时未来记录并触发重新生成",
+                    preset.name, toDelete.size());
+        }
+        return changed;
+    }
+
     private static final List<PredefinedRecurring> PREDEFINED_RECURRING = List.of(
         new PredefinedRecurring("预缴当月房贷", "转账",
-            new BigDecimal("4300.00"), null, "招行朝朝宝°", "中信银行", 19,
+            new BigDecimal("4300.00"), null, null, "招行朝朝宝°", "中信银行", 19,
             LocalDate.of(2024, 12, 19), List.of()),
-        new PredefinedRecurring("商贷", "支出",
-            new BigDecimal("2985.34"), "房产", "中信银行", null, 20,
+        // 商贷/公积金贷款：应付款项（房产° 虚拟债务账户每月累加）。
+        // 未来期由调度器生成，显示在"应收应付款项·未开始" Tab。
+        new PredefinedRecurring("商贷", "应付款项",
+            new BigDecimal("2985.34"), "应付款项", "房贷", "房产°", null, 20,
             LocalDate.of(2025, 4, 20), List.of("应交当月房贷")),
-        new PredefinedRecurring("公积金贷款", "支出",
-            new BigDecimal("1200.51"), "房产", "中信银行", null, 20,
+        new PredefinedRecurring("公积金贷款", "应付款项",
+            new BigDecimal("1200.51"), "应付款项", "房贷", "房产°", null, 20,
             LocalDate.of(2025, 5, 20), List.of())
     );
 
@@ -253,6 +311,7 @@ public class MozeCsvImporter {
             String recordType,
             BigDecimal amount,
             String mainCategory,
+            String subCategory,
             String account,
             String targetAccount,
             int dayOfMonth,
