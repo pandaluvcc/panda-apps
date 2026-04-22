@@ -36,13 +36,12 @@ public class ReceivableService {
         Map<Long, List<Record>> childrenByParent = groupChildrenByParent(parents);
         LocalDateTime now = LocalDateTime.now();
 
+        List<Record> filtered = filterForStatus(parents, childrenByParent, status, now);
         List<ReceivableResponse> result = new ArrayList<>();
-        for (Record p : parents) {
-            List<Record> children = childrenByParent.getOrDefault(p.getId(), List.of());
-            String s = computeStatus(p, children, now);
-            if (!s.equals(status)) continue;
+        for (Record p : filtered) {
             if (target != null && !matchTarget(p, target)) continue;
-            result.add(ReceivableResponse.of(p, children, s));
+            List<Record> children = childrenByParent.getOrDefault(p.getId(), List.of());
+            result.add(ReceivableResponse.of(p, children, status));
         }
         return result;
     }
@@ -52,24 +51,55 @@ public class ReceivableService {
         Map<Long, List<Record>> childrenByParent = groupChildrenByParent(parents);
         LocalDateTime now = LocalDateTime.now();
 
+        List<Record> inProgress = filterForStatus(parents, childrenByParent, STATUS_IN_PROGRESS, now);
+        List<Record> notStarted = filterForStatus(parents, childrenByParent, STATUS_NOT_STARTED, now);
+        List<Record> completed = filterForStatus(parents, childrenByParent, STATUS_COMPLETED, now);
+
         BigDecimal net = BigDecimal.ZERO;
-        int inProgress = 0, notStarted = 0, completed = 0;
-        for (Record p : parents) {
-            List<Record> children = childrenByParent.getOrDefault(p.getId(), List.of());
-            String s = computeStatus(p, children, now);
-            switch (s) {
-                case STATUS_COMPLETED -> completed++;
-                case STATUS_NOT_STARTED -> { notStarted++; net = net.add(signedRemaining(p, children)); }
-                case STATUS_IN_PROGRESS -> { inProgress++; net = net.add(signedRemaining(p, children)); }
-                default -> { }
-            }
-        }
+        for (Record p : inProgress) net = net.add(signedRemaining(p, childrenByParent.getOrDefault(p.getId(), List.of())));
+        for (Record p : notStarted) net = net.add(signedRemaining(p, childrenByParent.getOrDefault(p.getId(), List.of())));
+
         return ReceivableSummaryResponse.builder()
                 .netAmount(net)
-                .inProgressCount(inProgress)
-                .notStartedCount(notStarted)
-                .completedCount(completed)
+                .inProgressCount(inProgress.size())
+                .notStartedCount(notStarted.size())
+                .completedCount(completed.size())
                 .build();
+    }
+
+    /**
+     * 状态筛选 + 未开始 Tab 的 "每周期事件只保留下一期" 逻辑。
+     * 原始 DB 里可能有调度器生成的多期未来记录（~3 年），但 Moze 语义下 未开始 Tab
+     * 只显示每个周期事件的"下一期"，避免一屏刷出几十条。
+     */
+    private List<Record> filterForStatus(List<Record> parents,
+                                          Map<Long, List<Record>> childrenByParent,
+                                          String status,
+                                          LocalDateTime now) {
+        List<Record> matched = new ArrayList<>();
+        for (Record p : parents) {
+            List<Record> children = childrenByParent.getOrDefault(p.getId(), List.of());
+            if (status.equals(computeStatus(p, children, now))) matched.add(p);
+        }
+        if (!STATUS_NOT_STARTED.equals(status)) return matched;
+
+        // 未开始：按 recurringEventId 分组，每组只保留日期最早的一条；非周期事件的未来记录全部保留
+        Map<Long, Record> earliestPerEvent = new HashMap<>();
+        List<Record> withoutEvent = new ArrayList<>();
+        for (Record p : matched) {
+            Long eventId = p.getRecurringEventId();
+            if (eventId == null) {
+                withoutEvent.add(p);
+                continue;
+            }
+            Record existing = earliestPerEvent.get(eventId);
+            if (existing == null || p.getDate().isBefore(existing.getDate())) {
+                earliestPerEvent.put(eventId, p);
+            }
+        }
+        List<Record> result = new ArrayList<>(earliestPerEvent.values());
+        result.addAll(withoutEvent);
+        return result;
     }
 
     @Transactional
