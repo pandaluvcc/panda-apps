@@ -55,9 +55,9 @@ public class ReceivableService {
         List<Record> notStarted = filterForStatus(parents, childrenByParent, STATUS_NOT_STARTED, now);
         List<Record> completed = filterForStatus(parents, childrenByParent, STATUS_COMPLETED, now);
 
+        // 首页 netAmount 只算进行中（与 Moze 行为一致：未开始是预期的未来事件，不算当前负债）
         BigDecimal net = BigDecimal.ZERO;
         for (Record p : inProgress) net = net.add(signedRemaining(p, childrenByParent.getOrDefault(p.getId(), List.of())));
-        for (Record p : notStarted) net = net.add(signedRemaining(p, childrenByParent.getOrDefault(p.getId(), List.of())));
 
         return ReceivableSummaryResponse.builder()
                 .netAmount(net)

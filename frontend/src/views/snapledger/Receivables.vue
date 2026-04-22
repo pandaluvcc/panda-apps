@@ -21,7 +21,7 @@
 
     <div class="summary-row" v-if="!loading && items.length > 0">
       <span class="summary-label">— 不限定对象 ({{ items.length }})</span>
-      <span class="summary-amount" :class="summaryClass">
+      <span class="summary-amount" v-if="activeTab !== 'COMPLETED'">
         {{ formatSignedAmount(totalSigned) }}
       </span>
     </div>
