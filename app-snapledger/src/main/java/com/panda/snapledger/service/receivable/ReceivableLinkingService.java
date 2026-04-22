@@ -16,22 +16,21 @@ import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * 应收应付款项父子关系启发式建链。
- * 导入 CSV 后调用 linkAll()，基于 (账户, 名称, recordType) 分组 + FIFO 匹配。
+ *
+ * 算法（在 docs/receivable_sim.py 上验证过，与真实 CSV 数据的 Moze 汇总误差 ≈ 40 元）：
+ *
+ * 1. 按 (subCategory, name, recordType) 分组（忽略 account —— 借/还可能跨账户）。
+ * 2. 组内按 日期 ASC、主方向优先、时间 ASC 排序。
+ * 3. FIFO 配对：主方向金额入队，子方向金额消耗队首；单条子记录金额溢出时继续扣减下一主记录。
+ * 4. 兜底 Pass 2：主阶段产生的 orphan 子记录（同组内无主可配），尝试挂到同
+ *    (subCategory, recordType) 下的**空名称**主记录（后者语义上是泛用债务入账）。
  */
 @Slf4j
 @Service
 public class ReceivableLinkingService {
-
-    /**
-     * 跨账户配对子类别：主记录（虚拟债务账户+正金额）与还款（实际支付账户-负金额）跨账户成对出现。
-     * 这类子类别分组时忽略 account。
-     */
-    private static final Set<String> CROSS_ACCOUNT_SUB_CATEGORIES =
-            Set.of("房贷", "车贷", "信贷", "利息");
 
     private final RecordRepository recordRepository;
 
@@ -47,80 +46,121 @@ public class ReceivableLinkingService {
         List<Record> all = recordRepository.findAllReceivableForLinking();
         log.info("Receivable link: scanning {} records", all.size());
 
+        // Pass 1: 按 (subCategory, name, recordType) 分组 FIFO
         Map<String, List<Record>> groups = new LinkedHashMap<>();
         for (Record r : all) {
             groups.computeIfAbsent(groupKey(r), k -> new ArrayList<>()).add(r);
         }
 
         int linkedCount = 0;
-        int unpairedParents = 0;
-        BigDecimal unpairedTotal = BigDecimal.ZERO;
-        for (Map.Entry<String, List<Record>> e : groups.entrySet()) {
-            GroupResult gr = processGroup(e.getValue());
+        List<PendingParent> unpairedAll = new ArrayList<>();
+        List<Record> orphans = new ArrayList<>();
+        for (List<Record> group : groups.values()) {
+            GroupResult gr = processGroup(group);
             linkedCount += gr.linked;
-            unpairedParents += gr.unpairedParents;
-            unpairedTotal = unpairedTotal.add(gr.unpairedAmount);
-            if (gr.unpairedParents > 0) {
-                log.info("  group [{}]: size={} linked={} unpairedParents={} unpairedAmount={}",
-                        e.getKey(), e.getValue().size(), gr.linked, gr.unpairedParents, gr.unpairedAmount);
+            unpairedAll.addAll(gr.unpaired);
+            orphans.addAll(gr.orphans);
+        }
+
+        // Pass 2: fallback — orphan 子记录挂到同 (subCategory, recordType) 空名称主记录
+        Map<String, Deque<PendingParent>> fallback = new LinkedHashMap<>();
+        for (PendingParent pp : unpairedAll) {
+            if (pp.parent.getName() == null || pp.parent.getName().isEmpty()) {
+                fallback.computeIfAbsent(fallbackKey(pp.parent), k -> new ArrayDeque<>()).add(pp);
+            }
+        }
+        // 每个 fallback 桶按父记录日期升序
+        for (Deque<PendingParent> q : fallback.values()) {
+            List<PendingParent> list = new ArrayList<>(q);
+            list.sort(Comparator
+                    .comparing((PendingParent p) -> safeDate(p.parent))
+                    .thenComparing(p -> safeTime(p.parent)));
+            q.clear();
+            q.addAll(list);
+        }
+        // orphan 子按日期升序
+        orphans.sort(Comparator
+                .comparing(this::safeDate)
+                .thenComparing(this::safeTime));
+        for (Record child : orphans) {
+            Deque<PendingParent> q = fallback.get(fallbackKey(child));
+            if (q == null || q.isEmpty()) continue;
+            BigDecimal remaining = child.getAmount().abs();
+            boolean linkedOnce = false;
+            while (remaining.signum() > 0 && !q.isEmpty()) {
+                PendingParent head = q.peek();
+                if (!linkedOnce) {
+                    child.setParentRecordId(head.parent.getId());
+                    recordRepository.save(child);
+                    linkedCount++;
+                    linkedOnce = true;
+                }
+                BigDecimal take = head.remaining.min(remaining);
+                head.remaining = head.remaining.subtract(take);
+                remaining = remaining.subtract(take);
+                if (head.remaining.signum() <= 0) q.poll();
+            }
+        }
+
+        int unpairedCount = 0;
+        BigDecimal unpairedAmount = BigDecimal.ZERO;
+        for (PendingParent pp : unpairedAll) {
+            if (pp.remaining.signum() > 0) {
+                unpairedCount++;
+                unpairedAmount = unpairedAmount.add(pp.remaining);
             }
         }
         log.info("Receivable link: groups={} linked={} unpairedParents={} unpairedAmountAbsSum={}",
-                groups.size(), linkedCount, unpairedParents, unpairedTotal);
-        return new LinkStats(groups.size(), linkedCount, unpairedParents, unpairedTotal);
+                groups.size(), linkedCount, unpairedCount, unpairedAmount);
+        return new LinkStats(groups.size(), linkedCount, unpairedCount, unpairedAmount);
     }
-
-    public record LinkStats(int groups, int linked, int unpairedParents, BigDecimal unpairedAmount) {}
-    private record GroupResult(int linked, int unpairedParents, BigDecimal unpairedAmount) {}
 
     private String groupKey(Record r) {
+        String sub = r.getSubCategory() == null ? "" : r.getSubCategory();
         String name = r.getName() == null ? "" : r.getName();
-        // 跨账户配对的子类别（房贷/车贷/信贷/利息）忽略 account
-        String accountPart = CROSS_ACCOUNT_SUB_CATEGORIES.contains(r.getSubCategory())
-                ? ""
-                : (r.getAccount() == null ? "" : r.getAccount());
-        return accountPart + "|" + name + "|" + r.getRecordType();
+        return sub + "|" + name + "|" + r.getRecordType();
     }
 
-    /**
-     * 同组按时间升序遍历：
-     * - 主方向金额：压入 FIFO 队列作为待还款主记录
-     * - 子方向金额：按 FIFO 扣减队首主记录剩余额，parentRecordId 指向队首
-     * 主方向判定：应收款项=负 / 应付款项=正
-     */
+    private String fallbackKey(Record r) {
+        String sub = r.getSubCategory() == null ? "" : r.getSubCategory();
+        return sub + "|" + r.getRecordType();
+    }
+
     private GroupResult processGroup(List<Record> group) {
         group.sort(Comparator
-                .comparing((Record r) -> r.getDate() == null ? LocalDate.MIN : r.getDate())
+                .comparing((Record r) -> safeDate(r))
                 .thenComparing((Record r) -> isParentDirection(r) ? 0 : 1)
-                .thenComparing(r -> r.getTime() == null ? LocalTime.MIN : r.getTime()));
+                .thenComparing(this::safeTime));
         int linked = 0;
         Deque<PendingParent> queue = new ArrayDeque<>();
+        List<Record> orphans = new ArrayList<>();
         for (Record r : group) {
             if (isParentDirection(r)) {
                 queue.add(new PendingParent(r, r.getAmount().abs()));
                 continue;
             }
-            if (queue.isEmpty()) {
-                log.warn("Orphan child (no parent in queue): id={} name={} account={} amount={} date={}",
-                        r.getId(), r.getName(), r.getAccount(), r.getAmount(), r.getDate());
-                continue;
-            }
+            // 子方向：按 FIFO 消耗队首，溢出继续扣下一主
             BigDecimal remaining = r.getAmount().abs();
-            PendingParent head = queue.peek();
-            r.setParentRecordId(head.parent.getId());
-            recordRepository.save(r);
-            linked++;
-            head.remaining = head.remaining.subtract(remaining);
-            if (head.remaining.signum() <= 0) {
-                queue.poll();
+            boolean linkedOnce = false;
+            while (remaining.signum() > 0 && !queue.isEmpty()) {
+                PendingParent head = queue.peek();
+                if (!linkedOnce) {
+                    r.setParentRecordId(head.parent.getId());
+                    recordRepository.save(r);
+                    linked++;
+                    linkedOnce = true;
+                }
+                BigDecimal take = head.remaining.min(remaining);
+                head.remaining = head.remaining.subtract(take);
+                remaining = remaining.subtract(take);
+                if (head.remaining.signum() <= 0) queue.poll();
+            }
+            if (!linkedOnce) {
+                orphans.add(r);
             }
         }
-        int unpaired = queue.size();
-        BigDecimal unpairedAmt = BigDecimal.ZERO;
-        for (PendingParent p : queue) {
-            unpairedAmt = unpairedAmt.add(p.remaining);
-        }
-        return new GroupResult(linked, unpaired, unpairedAmt);
+        List<PendingParent> unpaired = new ArrayList<>(queue);
+        return new GroupResult(linked, unpaired, orphans);
     }
 
     private boolean isParentDirection(Record r) {
@@ -130,9 +170,21 @@ public class ReceivableLinkingService {
         return r.getAmount().signum() > 0;
     }
 
+    private LocalDate safeDate(Record r) {
+        return r.getDate() == null ? LocalDate.MIN : r.getDate();
+    }
+
+    private LocalTime safeTime(Record r) {
+        return r.getTime() == null ? LocalTime.MIN : r.getTime();
+    }
+
     private static class PendingParent {
         final Record parent;
         BigDecimal remaining;
-        PendingParent(Record p, BigDecimal r) { parent = p; remaining = r; }
+        PendingParent(Record p, BigDecimal r) { this.parent = p; this.remaining = r; }
     }
+
+    private record GroupResult(int linked, List<PendingParent> unpaired, List<Record> orphans) {}
+
+    public record LinkStats(int groups, int linked, int unpairedParents, BigDecimal unpairedAmount) {}
 }
