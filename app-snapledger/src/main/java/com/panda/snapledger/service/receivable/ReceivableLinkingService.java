@@ -7,8 +7,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,8 +26,11 @@ import java.util.Set;
 @Service
 public class ReceivableLinkingService {
 
-    /** 不参与 FIFO 启发式的子类别（每期独立主记录） */
-    private static final Set<String> NON_PAIRING_SUB_CATEGORIES =
+    /**
+     * 跨账户配对子类别：主记录（虚拟债务账户+正金额）与还款（实际支付账户-负金额）跨账户成对出现。
+     * 这类子类别分组时忽略 account。
+     */
+    private static final Set<String> CROSS_ACCOUNT_SUB_CATEGORIES =
             Set.of("房贷", "车贷", "信贷", "利息");
 
     private final RecordRepository recordRepository;
@@ -42,7 +48,6 @@ public class ReceivableLinkingService {
 
         Map<String, List<Record>> groups = new LinkedHashMap<>();
         for (Record r : all) {
-            if (isNonPairing(r)) continue;
             groups.computeIfAbsent(groupKey(r), k -> new ArrayList<>()).add(r);
         }
 
@@ -53,14 +58,13 @@ public class ReceivableLinkingService {
         log.info("Linked {} receivable child records across {} groups", linkedCount, groups.size());
     }
 
-    private boolean isNonPairing(Record r) {
-        return NON_PAIRING_SUB_CATEGORIES.contains(r.getSubCategory());
-    }
-
     private String groupKey(Record r) {
-        return (r.getAccount() == null ? "" : r.getAccount())
-                + "|" + (r.getName() == null ? "" : r.getName())
-                + "|" + r.getRecordType();
+        String name = r.getName() == null ? "" : r.getName();
+        // 跨账户配对的子类别（房贷/车贷/信贷/利息）忽略 account
+        String accountPart = CROSS_ACCOUNT_SUB_CATEGORIES.contains(r.getSubCategory())
+                ? ""
+                : (r.getAccount() == null ? "" : r.getAccount());
+        return accountPart + "|" + name + "|" + r.getRecordType();
     }
 
     /**
@@ -70,6 +74,10 @@ public class ReceivableLinkingService {
      * 主方向判定：应收款项=负 / 应付款项=正
      */
     private int processGroup(List<Record> group) {
+        // 组内按日期+时间升序（跨账户配对场景下 SQL 排序靠 account，需在组内重排）
+        group.sort(Comparator
+                .comparing((Record r) -> r.getDate() == null ? LocalDate.MIN : r.getDate())
+                .thenComparing(r -> r.getTime() == null ? LocalTime.MIN : r.getTime()));
         int linked = 0;
         Deque<PendingParent> queue = new ArrayDeque<>();
         for (Record r : group) {

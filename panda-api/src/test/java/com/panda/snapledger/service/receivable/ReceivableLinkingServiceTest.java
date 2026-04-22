@@ -101,15 +101,28 @@ class ReceivableLinkingServiceTest {
     }
 
     @Test
-    void mortgageSubCategoryExcluded_fromHeuristicPairing() {
-        Record p1 = saveRecord("房产°", "商贷", "应付款项", "房贷",
+    void mortgagePairsLinkAcrossAccounts() {
+        // 房贷跨账户配对：房产°(+) 是借款主记录，中信银行(-) 是还款子记录
+        Record parent = saveRecord("房产°", "商贷", "应付款项", "房贷",
                 new BigDecimal("2985.34"), LocalDate.of(2025, 7, 20), LocalTime.of(18, 15));
-        Record p2 = saveRecord("中信银行", "商贷", "应付款项", "房贷",
+        Record child = saveRecord("中信银行", "商贷", "应付款项", "房贷",
                 new BigDecimal("-2985.34"), LocalDate.of(2025, 7, 20), LocalTime.of(23, 59));
 
         linkingService.linkAll();
 
-        assertThat(recordRepository.findById(p1.getId()).orElseThrow().getParentRecordId()).isNull();
-        assertThat(recordRepository.findById(p2.getId()).orElseThrow().getParentRecordId()).isNull();
+        assertThat(recordRepository.findById(parent.getId()).orElseThrow().getParentRecordId()).isNull();
+        assertThat(recordRepository.findById(child.getId()).orElseThrow().getParentRecordId())
+                .isEqualTo(parent.getId());
+    }
+
+    @Test
+    void mortgageWithoutPaymentStaysOutstanding() {
+        // 只有借款侧、无还款侧的房贷（最近的月份）应保持为未还
+        Record parent = saveRecord("房产°", "商贷", "应付款项", "房贷",
+                new BigDecimal("2985.34"), LocalDate.of(2025, 8, 20), LocalTime.of(18, 15));
+
+        linkingService.linkAll();
+
+        assertThat(recordRepository.findById(parent.getId()).orElseThrow().getParentRecordId()).isNull();
     }
 }
