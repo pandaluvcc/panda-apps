@@ -10,7 +10,7 @@
     </div>
     <div class="right">
       <div class="status-text">{{ statusText }}</div>
-      <div class="amount" :class="amountClass">¥{{ formatAmount(item.absAmount) }}</div>
+      <div class="amount" :class="amountClass">¥{{ formatAmount(displayAmount) }}</div>
       <div class="target-badge" v-if="item.account">{{ item.account }}</div>
     </div>
     <div class="check-circle" :class="{ active: selected }">
@@ -46,6 +46,13 @@ const iconBg = computed(() => meta.value.bg)
 const iconGlyph = computed(() => meta.value.glyph)
 
 const isReceivable = computed(() => props.item.recordType === '应收款项')
+
+// 主金额：已收/还部分扣除后的剩余（与 Moze 显示一致）。全额未还时等于 absAmount。
+// 已完成时显示原始金额（划线效果更清晰）。
+const displayAmount = computed(() => {
+  if (props.item.status === 'COMPLETED') return props.item.absAmount
+  return props.item.remaining ?? props.item.absAmount
+})
 
 const amountClass = computed(() => {
   if (props.item.status === 'COMPLETED') return 'completed'
