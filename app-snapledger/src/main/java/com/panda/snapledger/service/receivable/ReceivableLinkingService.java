@@ -74,9 +74,13 @@ public class ReceivableLinkingService {
      * 主方向判定：应收款项=负 / 应付款项=正
      */
     private int processGroup(List<Record> group) {
-        // 组内按日期+时间升序（跨账户配对场景下 SQL 排序靠 account，需在组内重排）
+        // 组内排序：
+        // 1) 日期升序
+        // 2) 同一天内主方向记录优先（跨账户配对的借/还可能被用户以任意顺序录入）
+        // 3) 同方向下按时间升序
         group.sort(Comparator
                 .comparing((Record r) -> r.getDate() == null ? LocalDate.MIN : r.getDate())
+                .thenComparing((Record r) -> isParentDirection(r) ? 0 : 1)
                 .thenComparing(r -> r.getTime() == null ? LocalTime.MIN : r.getTime()));
         int linked = 0;
         Deque<PendingParent> queue = new ArrayDeque<>();

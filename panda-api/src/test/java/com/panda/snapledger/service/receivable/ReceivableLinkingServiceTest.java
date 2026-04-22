@@ -116,6 +116,22 @@ class ReceivableLinkingServiceTest {
     }
 
     @Test
+    void mortgagePairsLink_whenChildTimeEarlierThanParent() {
+        // 用户可能先记了还款时间 (07:41)，后记借款时间 (17:19)，但两者同日
+        // 算法应按"主方向优先"排序，保证 parent 先入队
+        Record child = saveRecord("招商银行°", "6月房贷", "应付款项", "房贷",
+                new BigDecimal("-3922.72"), LocalDate.of(2022, 6, 20), LocalTime.of(7, 41));
+        Record parent = saveRecord("房产°", "6月房贷", "应付款项", "房贷",
+                new BigDecimal("3922.72"), LocalDate.of(2022, 6, 20), LocalTime.of(17, 19));
+
+        linkingService.linkAll();
+
+        assertThat(recordRepository.findById(parent.getId()).orElseThrow().getParentRecordId()).isNull();
+        assertThat(recordRepository.findById(child.getId()).orElseThrow().getParentRecordId())
+                .isEqualTo(parent.getId());
+    }
+
+    @Test
     void mortgageWithoutPaymentStaysOutstanding() {
         // 只有借款侧、无还款侧的房贷（最近的月份）应保持为未还
         Record parent = saveRecord("房产°", "商贷", "应付款项", "房贷",
