@@ -1,0 +1,1 @@
+D:\00-soft\13-anaconda3\python.exe: can't open file 'D:\\01-develop\\02-project\\panda\\panda-apps\\receivable_sim.py': [Errno 2] No such file or directory

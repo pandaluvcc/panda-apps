@@ -8,19 +8,17 @@ DEBUG empty-name 借入 应付款项 count: 5
 
 Groups: 42
 Linked children: 104
-Unpaired parents: 45 total_abs=70104.90
+Unpaired parents: 31 total_abs=59853.90
 Orphan children: 1
-Net summary (signed): -51024.90  (expect ~-37842.18)
+Net summary (signed): -46253.90  (expect ~-37842.18)
 
 Unpaired parents by name+sub:
     9  abs=    26868.06  房贷|商贷|应付款项
     3  abs=    11455.38  借入|我妈借我|应付款项
     9  abs=    10804.59  房贷|公积金贷款|应付款项
-   15  abs=        8640  借出|借给阿芳°|应收款项
-    6  abs=        7011  信贷||应付款项
+    8  abs=        5900  借出|借给阿芳°|应收款项
     1  abs=     3925.87  房贷|1月房贷|应付款项
     1  abs=         900  借出|借给星°|应收款项
-    1  abs=         500  借入||应付款项
 
 First 20 orphan children:
   2023/1/20 18:20 中信银行                 房贷                            amt=-3925.87

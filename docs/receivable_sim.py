@@ -79,16 +79,29 @@ for key, group in groups.items():
         if is_parent(r):
             queue.append([r, r["amount"].copy_abs()])
             continue
-        # 子记录挂到队首主记录，金额溢出丢弃（对应 DB 里单一 parentRecordId 的语义）
+        # 配对策略：
+        # 1) 优先找队列中"剩余额 == 子金额"的主记录（精确匹配，对应 Moze 手工关联）
+        # 2) 其次找"剩余额 >= 子金额"中 remaining 最小的（最契合的父）
+        # 3) 都没有则 FIFO 队首
         if not queue:
             orphan_children.append(r)
             continue
-        head = queue[0]
-        total_linked += 1
         child_abs = r["amount"].copy_abs()
+        exact_idx = None
+        smallest_idx = None
+        for i, item in enumerate(queue):
+            if item[1] == child_abs:
+                exact_idx = i
+                break
+            if item[1] >= child_abs:
+                if smallest_idx is None or item[1] < queue[smallest_idx][1]:
+                    smallest_idx = i
+        pick = exact_idx if exact_idx is not None else (smallest_idx if smallest_idx is not None else 0)
+        head = queue[pick]
+        total_linked += 1
         head[1] -= child_abs
         if head[1] <= 0:
-            queue.pop(0)
+            queue.pop(pick)
     for item in queue:
         unpaired_parents.append(item)
 
@@ -117,6 +130,30 @@ for c in orphan_children:
         q.pop(0)
 orphan_children = still_orphan
 unpaired_parents = named_unpaired + [item for q in fallback_queues.values() for item in q]
+
+# Pass 3: same-date + same-abs match (catches pairs where one side has empty name
+# or name-variant that primary grouping missed, like 1月房贷 / 中信银行 empty-name pair)
+pass3_orphans = []
+for c in orphan_children:
+    c_abs = c["amount"].copy_abs()
+    c_fb = fallback_key(c)
+    matched_idx = None
+    for i, item in enumerate(unpaired_parents):
+        p = item[0]
+        if fallback_key(p) != c_fb:
+            continue
+        if p["date"] != c["date"]:
+            continue
+        if item[1] == c_abs:
+            matched_idx = i
+            break
+    if matched_idx is not None:
+        total_linked += 1
+        unpaired_parents[matched_idx][1] -= c_abs
+    else:
+        pass3_orphans.append(c)
+unpaired_parents = [it for it in unpaired_parents if it[1] > 0]
+orphan_children = pass3_orphans
 
 unpaired_total = sum((rem for _, rem in unpaired_parents), Decimal(0))
 # signed net: 应付 negative, 应收 positive
