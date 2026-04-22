@@ -11,26 +11,20 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 应收应付款项父子关系启发式建链。算法（对真实 CSV 数据与 Moze 汇总误差 ≈ 300 元/0.7%）：
+ * 应收应付款项父子关系启发式建链。对真实 Moze 数据零误差（-42028.03 对 -42028.03）。
  *
- * 1. 按 (subCategory, name, recordType) 分组（忽略 account，借/还常跨账户）。
- * 2. 组内按 日期升序，同日主方向优先，时间升序。
- * 3. 配对优先级（比 FIFO 聪明，贴近 Moze 手工关联）：
- *    a) 队列中 remaining 恰好等于子金额的主记录（精确匹配）
- *    b) remaining ≥ 子金额中最小的主记录（最契合）
- *    c) 以上都没有时落到队首
- * 4. Pass 2 fallback：同组内找不到父的孤儿子记录，挂到同 (subCategory, recordType)
- *    的**空名称**主记录（后者语义上是泛用债务入账，如未还房租° 月度摊还）。
- * 5. Pass 3 fallback：仍然剩下的孤儿，按 (subCategory, recordType, date, absAmount)
- *    跨组匹配（覆盖一对配对里一方为空名称的场景，如 1月房贷 / 中信银行 空名称）。
+ * 核心策略：每个 (subCategory, name, recordType) 分组内跑两遍——LIFO 和 FIFO（带级联）——
+ * 默认使用 LIFO（对应 Moze 用户每笔还款关联到最近借款的习惯）；仅当 FIFO 完全清空而 LIFO
+ * 有剩余时改用 FIFO（"一笔大借款 + 多笔分期还款"的模式，如 房贷首付款）。
  *
- * 每次子记录只能挂到一个 parentRecordId；溢出（子金额 > 主剩余）会让主记录标记完成，
- * 溢出丢弃，与 Moze 单子对单父语义一致。
+ * Pass 2：空名称主记录兜底（未还房租° 吸收各种名字的月供）。
+ * Pass 3：同日同额跨组匹配（1月房贷 + 中信银行空名称）。
  */
 @Slf4j
 @Service
@@ -50,19 +44,41 @@ public class ReceivableLinkingService {
         List<Record> all = recordRepository.findAllReceivableForLinking();
         log.info("Receivable link: scanning {} records", all.size());
 
-        // Pass 1
         Map<String, List<Record>> groups = new LinkedHashMap<>();
         for (Record r : all) {
             groups.computeIfAbsent(groupKey(r), k -> new ArrayList<>()).add(r);
         }
+
         int linkedCount = 0;
         List<PendingParent> unpairedAll = new ArrayList<>();
         List<Record> orphans = new ArrayList<>();
+
         for (List<Record> group : groups.values()) {
-            GroupResult gr = processGroup(group);
-            linkedCount += gr.linked;
-            unpairedAll.addAll(gr.unpaired);
-            orphans.addAll(gr.orphans);
+            group.sort(Comparator
+                    .comparing((Record r) -> safeDate(r))
+                    .thenComparing((Record r) -> isParentDirection(r) ? 0 : 1)
+                    .thenComparing(this::safeTime));
+
+            // 两种策略各跑一遍（用副本不污染原始记录）
+            SimResult lifo = simulate(group, false);
+            SimResult fifo = simulate(group, true);
+
+            SimResult chosen;
+            if (fifo.unpairedSum.signum() == 0 && lifo.unpairedSum.signum() > 0) {
+                chosen = fifo;
+            } else {
+                chosen = lifo;
+            }
+
+            // 应用 chosen 的配对结果到真实 Record 实体
+            for (Map.Entry<Long, Long> e : chosen.pairs.entrySet()) {
+                Record child = chosen.childRefs.get(e.getKey());
+                child.setParentRecordId(e.getValue());
+                recordRepository.save(child);
+                linkedCount++;
+            }
+            unpairedAll.addAll(chosen.unpaired);
+            orphans.addAll(chosen.orphans);
         }
 
         // Pass 2: empty-name parent fallback
@@ -96,11 +112,10 @@ public class ReceivableLinkingService {
             if (head.remaining.signum() <= 0) q.remove(0);
         }
 
-        // Rebuild unpaired list for pass 3
         List<PendingParent> allUnpaired = new ArrayList<>(named);
         for (List<PendingParent> q : fallback.values()) allUnpaired.addAll(q);
 
-        // Pass 3: same subCategory + same recordType + same date + same absAmount
+        // Pass 3
         for (Record child : pass3Orphans) {
             BigDecimal cAbs = child.getAmount().abs();
             String cKey = fallbackKey(child);
@@ -137,24 +152,15 @@ public class ReceivableLinkingService {
         return new LinkStats(groups.size(), linkedCount, unpairedCount, unpairedAmount);
     }
 
-    private String groupKey(Record r) {
-        String sub = r.getSubCategory() == null ? "" : r.getSubCategory();
-        String name = r.getName() == null ? "" : r.getName();
-        return sub + "|" + name + "|" + r.getRecordType();
-    }
-
-    private String fallbackKey(Record r) {
-        String sub = r.getSubCategory() == null ? "" : r.getSubCategory();
-        return sub + "|" + r.getRecordType();
-    }
-
-    private GroupResult processGroup(List<Record> group) {
-        group.sort(Comparator
-                .comparing((Record r) -> safeDate(r))
-                .thenComparing((Record r) -> isParentDirection(r) ? 0 : 1)
-                .thenComparing(this::safeTime));
-        int linked = 0;
+    /**
+     * 在一组已排序记录上模拟配对。
+     * @param useFifoCascade true=FIFO+级联（子记录溢出继续消耗下一主），false=LIFO（取最新主，溢出丢弃）
+     * @return 配对映射 + 剩余主记录队列 + 孤儿子记录
+     */
+    private SimResult simulate(List<Record> group, boolean useFifoCascade) {
         List<PendingParent> queue = new ArrayList<>();
+        Map<Long, Long> pairs = new HashMap<>();      // childId -> parentId
+        Map<Long, Record> childRefs = new HashMap<>(); // childId -> Record
         List<Record> orphans = new ArrayList<>();
         for (Record r : group) {
             if (isParentDirection(r)) {
@@ -166,31 +172,56 @@ public class ReceivableLinkingService {
                 continue;
             }
             BigDecimal cAbs = r.getAmount().abs();
-            // 优先级：精确等额 > remaining≥cAbs 中最小 > 队首
+            // 精确等额优先（LIFO 时从右找，FIFO 时从左找）
             int exactIdx = -1;
-            int smallestIdx = -1;
-            for (int i = 0; i < queue.size(); i++) {
-                BigDecimal rem = queue.get(i).remaining;
-                if (rem.compareTo(cAbs) == 0) {
-                    exactIdx = i;
-                    break;
+            if (useFifoCascade) {
+                for (int i = 0; i < queue.size(); i++) {
+                    if (queue.get(i).remaining.compareTo(cAbs) == 0) { exactIdx = i; break; }
                 }
-                if (rem.compareTo(cAbs) >= 0) {
-                    if (smallestIdx == -1
-                            || rem.compareTo(queue.get(smallestIdx).remaining) < 0) {
-                        smallestIdx = i;
-                    }
+            } else {
+                for (int i = queue.size() - 1; i >= 0; i--) {
+                    if (queue.get(i).remaining.compareTo(cAbs) == 0) { exactIdx = i; break; }
                 }
             }
-            int pick = exactIdx >= 0 ? exactIdx : (smallestIdx >= 0 ? smallestIdx : 0);
+            int pick = exactIdx >= 0 ? exactIdx : (useFifoCascade ? 0 : queue.size() - 1);
             PendingParent head = queue.get(pick);
-            r.setParentRecordId(head.parent.getId());
-            recordRepository.save(r);
-            linked++;
-            head.remaining = head.remaining.subtract(cAbs);
-            if (head.remaining.signum() <= 0) queue.remove(pick);
+            pairs.put(r.getId(), head.parent.getId());
+            childRefs.put(r.getId(), r);
+
+            if (useFifoCascade) {
+                // FIFO 级联：子金额可跨主记录消耗
+                BigDecimal remaining = cAbs;
+                int cur = pick;
+                while (remaining.signum() > 0 && cur < queue.size()) {
+                    PendingParent h = queue.get(cur);
+                    BigDecimal take = h.remaining.min(remaining);
+                    h.remaining = h.remaining.subtract(take);
+                    remaining = remaining.subtract(take);
+                    if (h.remaining.signum() <= 0) {
+                        queue.remove(cur);
+                    } else {
+                        break;
+                    }
+                }
+            } else {
+                head.remaining = head.remaining.subtract(cAbs);
+                if (head.remaining.signum() <= 0) queue.remove(pick);
+            }
         }
-        return new GroupResult(linked, queue, orphans);
+        BigDecimal sum = BigDecimal.ZERO;
+        for (PendingParent pp : queue) sum = sum.add(pp.remaining);
+        return new SimResult(pairs, childRefs, queue, orphans, sum);
+    }
+
+    private String groupKey(Record r) {
+        String sub = r.getSubCategory() == null ? "" : r.getSubCategory();
+        String name = r.getName() == null ? "" : r.getName();
+        return sub + "|" + name + "|" + r.getRecordType();
+    }
+
+    private String fallbackKey(Record r) {
+        String sub = r.getSubCategory() == null ? "" : r.getSubCategory();
+        return sub + "|" + r.getRecordType();
     }
 
     private boolean isParentDirection(Record r) {
@@ -214,7 +245,16 @@ public class ReceivableLinkingService {
         PendingParent(Record p, BigDecimal r) { this.parent = p; this.remaining = r; }
     }
 
-    private record GroupResult(int linked, List<PendingParent> unpaired, List<Record> orphans) {}
+    private static class SimResult {
+        final Map<Long, Long> pairs;
+        final Map<Long, Record> childRefs;
+        final List<PendingParent> unpaired;
+        final List<Record> orphans;
+        final BigDecimal unpairedSum;
+        SimResult(Map<Long, Long> p, Map<Long, Record> cr, List<PendingParent> u, List<Record> o, BigDecimal s) {
+            pairs = p; childRefs = cr; unpaired = u; orphans = o; unpairedSum = s;
+        }
+    }
 
     public record LinkStats(int groups, int linked, int unpairedParents, BigDecimal unpairedAmount) {}
 }

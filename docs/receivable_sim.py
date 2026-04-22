@@ -72,36 +72,74 @@ unpaired_parents = []  # list of [record, remaining]
 orphan_children = []
 
 # Pass 1: primary FIFO by (subCategory, name, recordType)
-for key, group in groups.items():
-    group.sort(key=lambda r: (parse_date(r["date"]), 0 if is_parent(r) else 1, parse_time(r["time"])))
+def simulate(group, strategy):
+    """返回 (paired_child_to_parent: dict id->parent_id, leftover_queue_remaining: list of (record, remaining), orphans)"""
     queue = []
+    pair = {}
+    orphans = []
     for r in group:
         if is_parent(r):
             queue.append([r, r["amount"].copy_abs()])
             continue
-        # 配对策略：
-        # 1) 优先找队列中"剩余额 == 子金额"的主记录（精确匹配，对应 Moze 手工关联）
-        # 2) 其次找"剩余额 >= 子金额"中 remaining 最小的（最契合的父）
-        # 3) 都没有则 FIFO 队首
         if not queue:
-            orphan_children.append(r)
+            orphans.append(r)
             continue
         child_abs = r["amount"].copy_abs()
+        # Exact match first (anywhere in queue)
         exact_idx = None
-        smallest_idx = None
-        for i, item in enumerate(queue):
-            if item[1] == child_abs:
+        if strategy == "lifo":
+            rng = range(len(queue) - 1, -1, -1)
+        else:
+            rng = range(len(queue))
+        for i in rng:
+            if queue[i][1] == child_abs:
                 exact_idx = i
                 break
-            if item[1] >= child_abs:
-                if smallest_idx is None or item[1] < queue[smallest_idx][1]:
-                    smallest_idx = i
-        pick = exact_idx if exact_idx is not None else (smallest_idx if smallest_idx is not None else 0)
+        if exact_idx is not None:
+            pick = exact_idx
+        elif strategy == "lifo":
+            pick = len(queue) - 1
+        else:  # fifo
+            pick = 0
         head = queue[pick]
-        total_linked += 1
-        head[1] -= child_abs
-        if head[1] <= 0:
-            queue.pop(pick)
+        pair[id(r)] = head[0]
+        if strategy == "fifo":
+            # FIFO allows overflow cascade
+            remaining = child_abs
+            cur_pick = pick
+            while remaining > 0 and queue:
+                h = queue[cur_pick]
+                take = min(h[1], remaining)
+                h[1] -= take
+                remaining -= take
+                if h[1] <= 0:
+                    queue.pop(cur_pick)
+                    if cur_pick >= len(queue):
+                        break
+                else:
+                    break
+        else:
+            head[1] -= child_abs
+            if head[1] <= 0:
+                queue.pop(pick)
+    return pair, queue, orphans
+
+for key, group in groups.items():
+    group.sort(key=lambda r: (parse_date(r["date"]), 0 if is_parent(r) else 1, parse_time(r["time"])))
+    pair_l, q_l, orp_l = simulate(list(group), "lifo")
+    pair_f, q_f, orp_f = simulate(list(group), "fifo")
+    sum_l = sum(it[1] for it in q_l)
+    sum_f = sum(it[1] for it in q_f)
+    # Rule: default LIFO (matches Moze's per-repayment manual linking).
+    # Fall back to FIFO only when FIFO fully clears the group (sum_f == 0) but
+    # LIFO didn't — indicating a "single big loan, many installments" pattern
+    # where children collectively cover parents.
+    if sum_f == 0 and sum_l > 0:
+        pair, queue, orph = pair_f, q_f, orp_f
+    else:
+        pair, queue, orph = pair_l, q_l, orp_l
+    total_linked += len(pair)
+    orphan_children.extend(orph)
     for item in queue:
         unpaired_parents.append(item)
 
