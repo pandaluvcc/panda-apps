@@ -67,16 +67,16 @@
 
   /* 日历日期颜色 — 三档 × 三色相（见 calendar-view-redesign-design） */
   --cal-weekday-strong: #323233;
-  --cal-weekday-weak: #c8c9cc;
-  --cal-weekday-faint: #ebedf0;
+  --cal-weekday-weak: #969799;
+  --cal-weekday-faint: #dcdee0;
 
   --cal-sunday-strong: #ee0a24;
-  --cal-sunday-weak: #fcc9ce;
-  --cal-sunday-faint: #fde6e9;
+  --cal-sunday-weak: #f4a7af;
+  --cal-sunday-faint: #fde0e5;
 
   --cal-saturday-strong: #07c160;
-  --cal-saturday-weak: #bfe7cc;
-  --cal-saturday-faint: #dff3e6;
+  --cal-saturday-weak: #a5dcb8;
+  --cal-saturday-faint: #e6f4eb;
 
   --cal-today-ring: #1989fa;
   --cal-selected-ring: #c8c9cc;
@@ -117,16 +117,16 @@
     --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.4);
 
     --cal-weekday-strong: #e5e5e5;
-    --cal-weekday-weak: #6b6b6b;
-    --cal-weekday-faint: #3a3a3a;
+    --cal-weekday-weak: #909090;
+    --cal-weekday-faint: #505050;
 
     --cal-sunday-strong: #ff6b6b;
-    --cal-sunday-weak: #8a4a4f;
-    --cal-sunday-faint: #4a2a2e;
+    --cal-sunday-weak: #c57075;
+    --cal-sunday-faint: #7a3a3d;
 
     --cal-saturday-strong: #6dd580;
-    --cal-saturday-weak: #4a7555;
-    --cal-saturday-faint: #2a4532;
+    --cal-saturday-weak: #6aa378;
+    --cal-saturday-faint: #3d5a43;
 
     --cal-today-ring: #4da5ff;
     --cal-selected-ring: #6b6b6b;

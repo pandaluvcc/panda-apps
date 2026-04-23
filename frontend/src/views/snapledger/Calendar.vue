@@ -99,10 +99,18 @@ function updateSelectedMonthValue() {
 }
 
 function onMonthConfirm({ selectedValues }) {
-  year.value = parseInt(selectedValues[0])
-  month.value = parseInt(selectedValues[1])
+  const newYear = parseInt(selectedValues[0])
+  const newMonth = parseInt(selectedValues[1])
+  year.value = newYear
+  month.value = newMonth
   updateSelectedMonthValue()
   showMonthPicker.value = false
+
+  // 跳月时把 selectedDate 同步到新月份的同号（超出月末则 clamp）
+  const currentDay = selectedDate.value.getDate()
+  const lastDay = new Date(newYear, newMonth, 0).getDate()
+  const day = Math.min(currentDay, lastDay)
+  onDateSelect(new Date(newYear, newMonth - 1, day))
 }
 
 function onDateSelect(date) {
