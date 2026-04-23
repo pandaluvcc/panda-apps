@@ -1,7 +1,9 @@
 <template>
   <div class="budget-card" @click="$router.push('/snap/budget')">
     <div class="icon">
-      <van-icon name="gold-coin-o" size="28" />
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M19 7.5h-1.13A8.97 8.97 0 0 0 14.5 4v2.5a.5.5 0 0 1-1 0V3.55a9.05 9.05 0 0 0-2 0V6.5a.5.5 0 0 1-1 0V4a8.97 8.97 0 0 0-3.37 3.5H6a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h.18c.26.92.7 1.76 1.29 2.5H6v2a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.35c.79.23 1.62.35 2.5.35s1.71-.12 2.5-.35V19a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-2h-.47A8.97 8.97 0 0 0 18.36 14H19a2 2 0 0 0 2-2V9.5a2 2 0 0 0-2-2zM16 11a1 1 0 1 1 0-2 1 1 0 0 1 0 2z" fill="currentColor"/>
+      </svg>
     </div>
     <div class="content">
       <div class="title">每月统计</div>

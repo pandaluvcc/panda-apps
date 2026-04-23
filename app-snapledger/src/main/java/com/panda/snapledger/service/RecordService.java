@@ -3,8 +3,10 @@ package com.panda.snapledger.service;
 import com.panda.snapledger.controller.dto.RecordDTO;
 import com.panda.snapledger.domain.Account;
 import com.panda.snapledger.domain.Record;
+import com.panda.snapledger.domain.RecurringEvent;
 import com.panda.snapledger.repository.AccountRepository;
 import com.panda.snapledger.repository.RecordRepository;
+import com.panda.snapledger.repository.RecurringEventRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,25 +26,32 @@ public class RecordService {
     private final RecordRepository recordRepository;
     private final AccountRepository accountRepository;
     private final AccountBalanceService balanceService;
+    private final RecurringEventRepository recurringEventRepository;
 
     public RecordService(RecordRepository recordRepository,
                          AccountRepository accountRepository,
-                         AccountBalanceService balanceService) {
+                         AccountBalanceService balanceService,
+                         RecurringEventRepository recurringEventRepository) {
         this.recordRepository = recordRepository;
         this.accountRepository = accountRepository;
         this.balanceService = balanceService;
+        this.recurringEventRepository = recurringEventRepository;
     }
 
     public List<RecordDTO> findByDate(LocalDate date) {
-        return recordRepository.findByDateOrderByTimeDesc(date).stream()
+        List<RecordDTO> dtos = recordRepository.findByDateOrderByTimeAscIdAsc(date).stream()
                 .map(RecordDTO::fromEntity)
                 .collect(Collectors.toList());
+        enrichWithRecurringInfo(dtos);
+        return dtos;
     }
 
     public List<RecordDTO> findByYearMonth(int year, int month) {
-        return recordRepository.findByYearAndMonth(year, month).stream()
+        List<RecordDTO> dtos = recordRepository.findByYearAndMonth(year, month).stream()
                 .map(RecordDTO::fromEntity)
                 .collect(Collectors.toList());
+        enrichWithRecurringInfo(dtos);
+        return dtos;
     }
 
     public RecordDTO findById(Long id) {
@@ -113,6 +123,26 @@ public class RecordService {
         recordRepository.delete(record);
         refreshBalance(accountName);
         refreshBalance(targetName);
+    }
+
+    /** RecurringEvent 字段回填：totalPeriods + targetAccount */
+    private void enrichWithRecurringInfo(List<RecordDTO> dtos) {
+        List<Long> ids = dtos.stream()
+                .map(RecordDTO::getRecurringEventId)
+                .filter(id -> id != null)
+                .distinct()
+                .collect(Collectors.toList());
+        if (ids.isEmpty()) return;
+        Map<Long, RecurringEvent> eventMap = recurringEventRepository.findAllById(ids)
+                .stream()
+                .collect(Collectors.toMap(RecurringEvent::getId, e -> e));
+        for (RecordDTO dto : dtos) {
+            if (dto.getRecurringEventId() == null) continue;
+            RecurringEvent event = eventMap.get(dto.getRecurringEventId());
+            if (event == null) continue;
+            dto.setRecurringTotalPeriods(event.getTotalPeriods());
+            dto.setRecurringTargetAccount(event.getTargetAccount());
+        }
     }
 
     /** 重算并持久化指定账户余额，账户不存在时静默跳过 */

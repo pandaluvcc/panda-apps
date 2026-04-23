@@ -16,6 +16,8 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
 
     List<Record> findByDateOrderByTimeDesc(LocalDate date);
 
+    List<Record> findByDateOrderByTimeAscIdAsc(LocalDate date);
+
     List<Record> findByDateBetweenOrderByDateDescTimeDesc(LocalDate start, LocalDate end);
 
     @Query("SELECT r FROM Record r WHERE YEAR(r.date) = :year AND MONTH(r.date) = :month ORDER BY r.date DESC, r.time DESC")

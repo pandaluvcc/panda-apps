@@ -31,6 +31,12 @@ public class RecordDTO {
     private String description;
     private String tags;
     private String target;
+    private Long recurringEventId;
+    private Integer periodNumber;
+    private Long installmentEventId;
+    private Integer installmentPeriodNumber;
+    private Integer recurringTotalPeriods;  // null = 无限期
+    private String recurringTargetAccount;  // null/空 = 不限定对象
 
     public static RecordDTO fromEntity(Record record) {
         RecordDTO dto = new RecordDTO();
@@ -52,6 +58,10 @@ public class RecordDTO {
         dto.setDescription(record.getDescription());
         dto.setTags(record.getTags());
         dto.setTarget(record.getTarget());
+        dto.setRecurringEventId(record.getRecurringEventId());
+        dto.setPeriodNumber(record.getPeriodNumber());
+        dto.setInstallmentEventId(record.getInstallmentEventId());
+        dto.setInstallmentPeriodNumber(record.getInstallmentPeriodNumber());
         return dto;
     }
 
