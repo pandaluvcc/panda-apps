@@ -7,13 +7,13 @@
   >
     <!-- 星期标题 -->
     <div class="week-header">
-      <span>周日</span>
+      <span class="sunday-col">周日</span>
       <span>周一</span>
       <span>周二</span>
       <span>周三</span>
       <span>周四</span>
       <span>周五</span>
-      <span>周六</span>
+      <span class="saturday-col">周六</span>
     </div>
 
     <!-- 日期格子 -->
@@ -22,30 +22,20 @@
         v-for="(day, index) in calendarDays"
         :key="index"
         class="day-cell"
-        :class="{
-          'selected': isSelected(day.date),
-          'has-records': day.recordCount > 0,
-          'today': isToday(day.date),
-          'empty': !day.date,
-          'sunday': day.date && day.dayOfWeek === 0,
-          'saturday': day.date && day.dayOfWeek === 6
-        }"
-        @click="day.date && $emit('select', day.date)"
+        :class="cellClasses(day)"
+        @click="onCellClick(day)"
       >
-        <span class="day-number">{{ day.date ? day.date.getDate() : '' }}</span>
-        <span v-if="day.recordCount > 0" class="dot"></span>
-        <div v-if="day.income > 0 || day.expense > 0" class="day-amounts">
-          <span v-if="day.income > 0" class="income">+{{ formatShort(day.income) }}</span>
-          <span v-if="day.expense > 0" class="expense">-{{ formatShort(day.expense) }}</span>
-        </div>
+        <span class="day-number">{{ cellLabel(day) }}</span>
       </div>
     </div>
+
+    <!-- 装饰性拉手条 -->
+    <div class="pull-handle"></div>
   </div>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
-import { formatDateISO } from '@/utils/format'
 
 const props = defineProps({
   year: { type: Number, required: true },
@@ -68,28 +58,20 @@ function onTouchStart(e) {
 function onTouchMove(e) {
   const deltaX = e.touches[0].clientX - touchStartX.value
   const deltaY = e.touches[0].clientY - touchStartY.value
-
-  // 如果是水平滑动且距离较大，阻止浏览器默认行为（防止触发返回）
   if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
     e.preventDefault()
   }
 }
 
 function onTouchEnd(e) {
-  const touchEndX = e.changedTouches[0].clientX
-  const touchEndY = e.changedTouches[0].clientY
-  const deltaX = touchEndX - touchStartX.value
-  const deltaY = touchEndY - touchStartY.value
-
-  // 只有水平滑动距离大于 50px 且垂直滑动距离较小时才触发
+  const deltaX = e.changedTouches[0].clientX - touchStartX.value
+  const deltaY = e.changedTouches[0].clientY - touchStartY.value
   if (Math.abs(deltaX) > 50 && Math.abs(deltaY) < 30) {
     if (deltaX > 0) {
-      // 向右滑 = 上一月
       transitionClass.value = 'slide-right'
       setTimeout(() => { transitionClass.value = '' }, 300)
       emit('swipe', 'prev')
     } else {
-      // 向左滑 = 下一月
       transitionClass.value = 'slide-left'
       setTimeout(() => { transitionClass.value = '' }, 300)
       emit('swipe', 'next')
@@ -101,54 +83,105 @@ const calendarDays = computed(() => {
   const firstDay = new Date(props.year, props.month - 1, 1)
   const lastDay = new Date(props.year, props.month, 0)
   const startPadding = firstDay.getDay()
+  const endPadding = 6 - lastDay.getDay()
+
+  const recordCountByDay = new Map()
+  for (const d of props.days) {
+    const dayNum = parseInt(d.date.split('-')[2], 10)
+    recordCountByDay.set(dayNum, d.recordCount || 0)
+  }
 
   const result = []
 
-  // 前置空白
-  for (let i = 0; i < startPadding; i++) {
-    result.push({ date: null, income: 0, expense: 0, recordCount: 0, dayOfWeek: null })
+  // 前置填充：上月末尾日期
+  for (let i = startPadding - 1; i >= 0; i--) {
+    const date = new Date(props.year, props.month - 1, -i)
+    result.push({
+      date,
+      dayOfWeek: date.getDay(),
+      recordCount: 0,
+      outOfMonth: true
+    })
   }
 
   // 当月日期
   for (let d = 1; d <= lastDay.getDate(); d++) {
     const date = new Date(props.year, props.month - 1, d)
-    const dayOfWeek = date.getDay()
-    const dayData = props.days.find(day => {
-      // 后端返回的日期格式为 YYYY-MM-DD，直接比较日期部分
-      const dayNum = parseInt(day.date.split('-')[2], 10)
-      return dayNum === d
-    }) || { date: formatDateISO(date), income: 0, expense: 0, recordCount: 0 }
-    result.push({ ...dayData, date, dayOfWeek })
+    result.push({
+      date,
+      dayOfWeek: date.getDay(),
+      recordCount: recordCountByDay.get(d) || 0,
+      outOfMonth: false
+    })
+  }
+
+  // 后置填充：下月开头日期
+  for (let i = 1; i <= endPadding; i++) {
+    const date = new Date(props.year, props.month, i)
+    result.push({
+      date,
+      dayOfWeek: date.getDay(),
+      recordCount: 0,
+      outOfMonth: true
+    })
   }
 
   return result
 })
 
-function isSelected(date) {
-  if (!date || !props.selectedDate) return false
-  return date.toDateString() === props.selectedDate.toDateString()
+function cellLabel(day) {
+  if (!day.outOfMonth && day.date.getDate() === 1) {
+    return `${day.date.getMonth() + 1}月`
+  }
+  return String(day.date.getDate()).padStart(2, '0')
+}
+
+function cellClasses(day) {
+  const classes = []
+
+  let hue
+  if (day.dayOfWeek === 0) hue = 'sunday'
+  else if (day.dayOfWeek === 6) hue = 'saturday'
+  else hue = 'weekday'
+
+  let tier
+  if (day.outOfMonth) tier = 'faint'
+  else if (day.recordCount > 0) tier = 'strong'
+  else tier = 'weak'
+
+  classes.push(`${hue}-${tier}`)
+  if (day.outOfMonth) classes.push('out-of-month')
+
+  if (isToday(day.date)) classes.push('is-today')
+  else if (isSelected(day.date)) classes.push('is-selected')
+
+  return classes
 }
 
 function isToday(date) {
-  if (!date) return false
-  return date.toDateString() === new Date().toDateString()
+  const now = new Date()
+  return date.getFullYear() === now.getFullYear()
+    && date.getMonth() === now.getMonth()
+    && date.getDate() === now.getDate()
 }
 
-function formatShort(amount) {
-  if (amount >= 10000) {
-    return (amount / 10000).toFixed(1) + 'w'
-  }
-  if (amount >= 1000) {
-    return (amount / 1000).toFixed(1) + 'k'
-  }
-  return amount.toFixed(0)
+function isSelected(date) {
+  if (!props.selectedDate) return false
+  return date.getFullYear() === props.selectedDate.getFullYear()
+    && date.getMonth() === props.selectedDate.getMonth()
+    && date.getDate() === props.selectedDate.getDate()
+}
+
+function onCellClick(day) {
+  if (day.outOfMonth) return
+  emit('select', day.date)
 }
 </script>
 
 <style scoped>
 .calendar-grid {
-  background: #fff;
-  padding: 12px;
+  background: var(--bg-white);
+  padding: 8px 12px 4px;
   position: relative;
   overflow: hidden;
 }
@@ -157,19 +190,14 @@ function formatShort(amount) {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   text-align: center;
-  font-size: 12px;
-  color: #333;
+  font-size: var(--font-size-xs);
+  color: var(--text-regular);
   margin-bottom: 8px;
   font-weight: 500;
 }
 
-.week-header span:first-child {
-  color: #ee0a24;
-}
-
-.week-header span:last-child {
-  color: #07c160;
-}
+.week-header .sunday-col { color: var(--cal-sunday-strong); }
+.week-header .saturday-col { color: var(--cal-saturday-strong); }
 
 .days-grid {
   display: grid;
@@ -180,100 +208,47 @@ function formatShort(amount) {
 .day-cell {
   aspect-ratio: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 50%;
   cursor: pointer;
   position: relative;
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  transition: background 0.15s;
 }
 
-.day-cell.empty {
+.out-of-month {
   cursor: default;
 }
 
-/* 未记账的日期 - 高透明度 */
-.day-cell:not(.empty):not(.has-records) {
-  opacity: 0.4;
+.weekday-strong { color: var(--cal-weekday-strong); }
+.weekday-weak   { color: var(--cal-weekday-weak); }
+.weekday-faint  { color: var(--cal-weekday-faint); }
+
+.sunday-strong  { color: var(--cal-sunday-strong); }
+.sunday-weak    { color: var(--cal-sunday-weak); }
+.sunday-faint   { color: var(--cal-sunday-faint); }
+
+.saturday-strong { color: var(--cal-saturday-strong); }
+.saturday-weak   { color: var(--cal-saturday-weak); }
+.saturday-faint  { color: var(--cal-saturday-faint); }
+
+.is-today {
+  box-shadow: inset 0 0 0 1.5px var(--cal-today-ring);
 }
 
-/* 已记账的日期 - 正常透明度，黑色字体 */
-.day-cell.has-records .day-number {
-  color: #333;
+.is-selected {
+  box-shadow: inset 0 0 0 1.5px var(--cal-selected-ring);
 }
 
-/* 周日红色 */
-.day-cell.sunday .day-number {
-  color: #ee0a24;
+.pull-handle {
+  width: 40px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border-color);
+  margin: 10px auto 4px;
 }
-
-/* 周六绿色 */
-.day-cell.saturday .day-number {
-  color: #07c160;
-}
-
-/* 选中状态 */
-.day-cell.selected {
-  background: #1989fa;
-}
-
-.day-cell.selected .day-number {
-  color: white;
-}
-
-.day-cell.selected .income {
-  color: #b5f5b5;
-}
-
-.day-cell.selected .expense {
-  color: #ffa39e;
-}
-
-/* 今日 */
-.day-cell.today .day-number {
-  font-weight: bold;
-}
-
-.day-cell.today:not(.selected) .day-number {
-  color: #1989fa;
-}
-
-/* 已记账日期覆盖周日/周六的颜色（保持黑色） */
-.day-cell.has-records:not(.selected) .day-number {
-  color: #333;
-}
-
-/* 但如果既是已记账又是周日/周六，保持红/绿色 */
-.day-cell.has-records.sunday:not(.selected) .day-number {
-  color: #ee0a24;
-}
-
-.day-cell.has-records.saturday:not(.selected) .day-number {
-  color: #07c160;
-}
-
-.day-cell.has-records .dot {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 4px;
-  height: 4px;
-  background: #1989fa;
-  border-radius: 50%;
-}
-
-.day-number {
-  font-size: 14px;
-}
-
-.day-amounts {
-  font-size: 11px;
-  margin-top: 2px;
-  line-height: 1.2;
-}
-
-.income { color: #07c160; }
-.expense { color: #ee0a24; }
 
 .days-grid {
   transition: transform 0.3s ease-out, opacity 0.3s ease-out;

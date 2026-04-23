@@ -83,7 +83,10 @@ describe('CalendarGrid', () => {
 
     it('周六+非当月 → saturday-faint', () => {
       const wrapper = mountGrid()
-      const may2 = wrapper.findAll('.day-cell').find(c => c.text() === '02')
+      // 4/2 和 5/2 都渲染为 '02'，需要用 out-of-month class 筛出 5/2
+      const may2 = wrapper.findAll('.day-cell').find(
+        c => c.text() === '02' && c.classes().includes('out-of-month')
+      )
       expect(may2.classes()).toContain('saturday-faint')
     })
 
