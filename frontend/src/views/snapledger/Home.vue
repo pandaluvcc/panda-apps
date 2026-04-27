@@ -1,6 +1,6 @@
 <template>
   <div class="accounts-overview">
-    <!-- 顶部导航 -->
+    <!-- 1. 顶部导航 (Moze 风格) -->
     <div class="nav-bar">
       <button class="nav-icon-btn" @click="amountVisible = !amountVisible">
         <svg v-if="amountVisible" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -21,12 +21,18 @@
       </button>
     </div>
 
-    <!-- 净值汇总 -->
+    <!-- 2. 净值汇总卡片 -->
     <div class="summary-section">
-      <div class="currency-label">指定 CNY</div>
-      <div class="net-worth" :class="netWorth >= 0 ? 'amount-positive' : 'amount-negative'">
-        {{ amountVisible ? formatK(netWorth) : '****' }}
+      <div class="summary-top-row">
+        <div class="summary-labels">
+          <span class="label-line">指定</span>
+          <span class="label-line">CNY</span>
+        </div>
+        <div :class="['net-worth', netWorth >= 0 ? 'amount-positive' : 'amount-negative']">
+          {{ amountVisible ? formatK(netWorth) : '****' }}
+        </div>
       </div>
+
       <div class="assets-debts-row">
         <span class="stat-item">
           总资产
@@ -38,9 +44,64 @@
           <span class="amount-negative">{{ amountVisible ? formatK(Math.abs(totalDebts)) : '****' }}</span>
         </span>
       </div>
+
+      <div class="group-ratio-link" @click="showToast('分组占比待开发')">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 2a10 10 0 0 1 7.07 17.07L12 12V2z" fill="currentColor" stroke="none"/>
+        </svg>
+        <span>各分组占比</span>
+      </div>
     </div>
 
-    <!-- 账户分组列表 -->
+    <!-- 3. 图表占位 -->
+    <div class="chart-placeholder">
+      <div class="chart-inner">
+        <div class="chart-y-axis">
+          <span v-for="label in yAxisLabels" :key="label" class="y-label">{{ label }}</span>
+        </div>
+        <div class="chart-area">
+          <div class="grid-lines">
+            <div v-for="i in 5" :key="i" class="grid-line"></div>
+          </div>
+          <div class="x-axis">
+            <span v-for="d in last7DaysLabels()" :key="d" class="x-label">{{ d }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. 日期选择行 -->
+    <div class="date-selector-row">
+      <div class="date-left">
+        <span class="date-text">{{ formatToday() }}</span>
+        <van-icon
+          name="share-o"
+          size="14"
+          class="calendar-jump-icon"
+          @click="$router.push('/snap/calendar')"
+        />
+      </div>
+      <div class="period-pill-wrap">
+        <button class="period-pill" @click="periodDropdownVisible = !periodDropdownVisible">
+          <van-icon name="calendar-o" size="13" />
+          <span>{{ periodGranularity }}</span>
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </button>
+        <div v-if="periodDropdownVisible" class="period-dropdown">
+          <div
+            v-for="opt in periodOptions"
+            :key="opt"
+            :class="['period-option', { active: periodGranularity === opt }]"
+            @click="selectPeriod(opt)"
+          >{{ opt }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. 账户分组列表 (保持原有逻辑和结构) -->
     <div class="groups-container">
       <div v-if="loading" class="loading-state">
         <van-loading color="#999" size="20" />
@@ -63,7 +124,7 @@
               <span class="group-name">{{ group.name }}</span>
               <span class="group-count">({{ group.totalCount }})</span>
             </div>
-            <span :class="['group-balance', group.balance >= 0 ? 'amount-positive' : 'amount-negative']">
+            <span class="group-balance">
               {{ amountVisible ? formatFullBalance(group.balance) : '****' }}
             </span>
           </div>
@@ -112,6 +173,7 @@
 <script setup>
 import { ref, computed, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
+import { showToast } from 'vant'
 import { getAccounts } from '@/api'
 import { getReceivablesSummary } from '@/api/snapledger/receivable'
 import SnapTabbar from '@/components/snapledger/SnapTabbar.vue'
@@ -123,7 +185,46 @@ const amountVisible = ref(true)
 const loading = ref(true)
 const accounts = ref([])
 
-// 分组展开状态持久化到 localStorage（默认全部折叠，用户展开后记忆）
+// ── 期间粒度选择 ──
+const PERIOD_KEY = 'snapledger:home:periodGranularity'
+const periodOptions = ['按日', '按周', '按月', '按年']
+const periodGranularity = ref(localStorage.getItem(PERIOD_KEY) || '按日')
+const periodDropdownVisible = ref(false)
+
+function selectPeriod(opt) {
+  periodGranularity.value = opt
+  periodDropdownVisible.value = false
+  try { localStorage.setItem(PERIOD_KEY, opt) } catch {}
+}
+
+// ── 日期辅助 ──
+function formatChinaWeekday(date) {
+  return ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()]
+}
+
+function formatToday() {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}/${m}/${day} ${formatChinaWeekday(d)}`
+}
+
+function last7DaysLabels() {
+  const labels = []
+  const today = new Date()
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(today.getDate() - i)
+    labels.push(`${d.getMonth() + 1}/${d.getDate()}`)
+  }
+  return labels
+}
+
+// Y 轴占位标签（从上到下降序）
+const yAxisLabels = ['800', '600', '400', '200', '0']
+
+// ── 分组展开状态持久化 ──
 const EXPANDED_GROUPS_KEY = 'snapledger:home:expandedGroups'
 const loadExpandedGroups = () => {
   try {
@@ -271,15 +372,17 @@ const accountGroups = computed(() => {
     group.accounts.sort((a, b) => (a.sortOrder || 999) - (b.sortOrder || 999))
   }
 
-  // 分组排序
-  return Object.values(groupMap).sort((a, b) => {
-    const ai = GROUP_ORDER.indexOf(a.name)
-    const bi = GROUP_ORDER.indexOf(b.name)
-    if (ai !== -1 && bi !== -1) return ai - bi
-    if (ai !== -1) return -1
-    if (bi !== -1) return 1
-    return a.name.localeCompare(b.name)
-  })
+  // 分组排序，并排除"归档"（用户不需要展示归档分组）
+  return Object.values(groupMap)
+    .filter(g => g.name !== '归档')
+    .sort((a, b) => {
+      const ai = GROUP_ORDER.indexOf(a.name)
+      const bi = GROUP_ORDER.indexOf(b.name)
+      if (ai !== -1 && bi !== -1) return ai - bi
+      if (ai !== -1) return -1
+      if (bi !== -1) return 1
+      return a.name.localeCompare(b.name)
+    })
 })
 
 // 总资产/总负债：直接复用 accountGroups 展示数据，确保"头部 = 页面所见之和"，单一事实来源。
@@ -361,11 +464,11 @@ function formatFullBalance(val) {
 <style scoped>
 .accounts-overview {
   min-height: 100vh;
-  background: #F7F8FA;
+  background: var(--bg-color);
   padding-bottom: 80px;
 }
 
-/* ── 顶部导航 ── */
+/* ── 1. 顶部导航 (Moze 风格) ── */
 .nav-bar {
   position: sticky;
   top: 0;
@@ -373,16 +476,14 @@ function formatFullBalance(val) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 52px;
-  padding: 0 16px;
-  background: #FFFFFF;
-  border-bottom: 1px solid #F0F0F0;
+  padding: 16px 16px 12px;
+  background: transparent;
 }
 
 .nav-title {
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 600;
-  color: #1A1A1A;
+  color: var(--text-primary);
 }
 
 .nav-icon-btn {
@@ -391,16 +492,17 @@ function formatFullBalance(val) {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #F4F4F4;
+  background: var(--bg-white);
+  box-shadow: var(--shadow-sm);
   border: none;
   border-radius: 50%;
-  color: #555;
+  color: var(--text-primary);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--transition-fast);
 }
 
 .nav-icon-btn:active {
-  background: #E8E8E8;
+  background: var(--bg-light);
 }
 
 .nav-icon-btn svg {
@@ -408,34 +510,60 @@ function formatFullBalance(val) {
   height: 20px;
 }
 
-/* ── 净值汇总 ── */
+/* ── 2. 净值汇总卡片 ── */
 .summary-section {
-  background: #FFFFFF;
-  padding: 24px 20px 20px;
-  margin-bottom: 8px;
+  background: var(--bg-white);
+  padding: 8px 20px 12px;
+  margin: 0 0 4px;
 }
 
-.currency-label {
-  font-size: 13px;
-  color: #888888;
-  margin-bottom: 4px;
-  letter-spacing: 0.3px;
+.summary-top-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.summary-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.label-line {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  line-height: 1.2;
+}
+
+.label-line:first-child {
+  color: var(--text-secondary);
+}
+
+.label-line:last-child {
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .net-worth {
-  font-size: 44px;
+  font-size: 36px;
   font-weight: 700;
   letter-spacing: -1px;
-  line-height: 1.1;
-  margin-bottom: 10px;
+  line-height: 1;
 }
 
 .assets-debts-row {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0;
   font-size: 13px;
-  color: #666666;
+  color: var(--text-regular);
+  margin-bottom: 8px;
 }
 
 .stat-item {
@@ -452,21 +580,185 @@ function formatFullBalance(val) {
 .stat-divider {
   width: 1px;
   height: 14px;
-  background: #E0E0E0;
+  background: var(--border-color);
   margin: 0 14px;
+}
+
+.group-ratio-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  justify-content: center;
+  width: 100%;
+}
+
+.group-ratio-link:active {
+  opacity: 0.6;
 }
 
 /* ── 颜色 ── */
 .amount-positive { color: #00B96B; }
 .amount-negative { color: #E53935; }
 
-/* ── 分组列表 ── */
+/* ── 3. 图表占位 ── */
+.chart-placeholder {
+  background: var(--bg-white);
+  padding: 8px 16px;
+  margin-bottom: 4px;
+  height: 130px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.chart-inner {
+  display: flex;
+  height: 100%;
+  gap: 8px;
+}
+
+.chart-y-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding-bottom: 20px;
+  min-width: 32px;
+}
+
+.y-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  line-height: 1;
+}
+
+.chart-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.grid-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border-left: 1px solid var(--border-lighter);
+}
+
+.grid-line {
+  width: 100%;
+  height: 1px;
+  background: var(--border-lighter);
+}
+
+.x-axis {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 4px;
+  height: 20px;
+}
+
+.x-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  line-height: 1;
+}
+
+/* ── 4. 日期选择行 ── */
+.date-selector-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-white);
+  padding: 12px 16px;
+  margin-bottom: 8px;
+}
+
+.date-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.date-text {
+  font-size: 13px;
+  color: var(--text-regular);
+}
+
+.calendar-jump-icon {
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.calendar-jump-icon:active {
+  opacity: 0.6;
+}
+
+.period-pill-wrap {
+  position: relative;
+}
+
+.period-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  background: var(--bg-light);
+  border: none;
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--text-regular);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.period-pill:active {
+  background: var(--border-color);
+}
+
+.period-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  background: var(--bg-white);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  z-index: 20;
+  min-width: 80px;
+}
+
+.period-option {
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.period-option:active,
+.period-option:hover {
+  background: var(--bg-light);
+}
+
+.period-option.active {
+  color: #1989fa;
+  font-weight: 500;
+}
+
+/* ── 5. 分组列表 ── */
 .groups-container {
-  background: #FFFFFF;
+  background: var(--bg-white);
 }
 
 .group-block {
-  border-bottom: 1px solid #F2F2F2;
+  border-bottom: 1px solid var(--border-lighter);
 }
 
 .group-block:last-child {
@@ -477,14 +769,14 @@ function formatFullBalance(val) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
-  height: 52px;
+  padding: 0 20px;
+  height: 44px;
   cursor: pointer;
-  transition: background 0.1s;
+  transition: background var(--transition-fast);
 }
 
 .group-row:active {
-  background: #FAFAFA;
+  background: var(--bg-light);
 }
 
 .group-left {
@@ -505,22 +797,23 @@ function formatFullBalance(val) {
 .group-name {
   font-size: 16px;
   font-weight: 500;
-  color: #1A1A1A;
+  color: var(--text-primary);
 }
 
 .group-count {
   font-size: 13px;
-  color: #AAAAAA;
+  color: var(--text-secondary);
 }
 
 .group-balance {
   font-size: 16px;
   font-weight: 500;
+  color: var(--text-secondary);
 }
 
 /* ── 展开的账户行 ── */
 .account-items {
-  background: #FAFAFA;
+  background: var(--bg-light);
   overflow: hidden;
 }
 
@@ -530,7 +823,7 @@ function formatFullBalance(val) {
   justify-content: space-between;
   padding: 0 16px 0 44px;
   height: 44px;
-  border-top: 1px solid #F2F2F2;
+  border-top: 1px solid var(--border-lighter);
 }
 
 .sub-account-row {
@@ -539,7 +832,7 @@ function formatFullBalance(val) {
 
 .account-name {
   font-size: 14px;
-  color: #555555;
+  color: var(--text-regular);
 }
 .account-name-wrap {
   display: flex;
@@ -549,7 +842,7 @@ function formatFullBalance(val) {
 }
 .account-subtitle {
   font-size: 11px;
-  color: #999;
+  color: var(--text-secondary);
   line-height: 1.2;
 }
 
@@ -590,7 +883,7 @@ function formatFullBalance(val) {
   align-items: center;
   padding: 48px 16px;
   gap: 12px;
-  color: #AAAAAA;
+  color: var(--text-secondary);
   font-size: 14px;
 }
 
@@ -602,8 +895,8 @@ function formatFullBalance(val) {
 .add-account-btn {
   margin-top: 4px;
   padding: 8px 24px;
-  background: #1A1A1A;
-  color: #FFFFFF;
+  background: var(--text-primary);
+  color: var(--bg-white);
   border: none;
   border-radius: 20px;
   font-size: 14px;
